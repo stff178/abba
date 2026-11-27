@@ -1,0 +1,19 @@
+# OS & Editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# Node / Optional dev tools
+node_modules/
+npm-debug.log*
+
+# Video recordings & release archives
+*.mp4
+*.mkv
+*.mov
+*.webm
+recordings/
+dist/

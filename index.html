@@ -1,0 +1,4607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anime Ball Battle Simulator — 9:16 TikTok/Shorts Engine</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #050508;
+      color: #f4f6fb;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Responsive 9:16 Stage Container (1080x1920 logical) */
+    #stage-wrapper {
+      position: relative;
+      height: 100vh;
+      width: calc(100vh * 9 / 16);
+      max-width: 100vw;
+      max-height: calc(100vw * 16 / 9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 70px rgba(0, 0, 0, 0.95);
+      background: #0d0d12;
+      overflow: hidden;
+    }
+
+    canvas#arena-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #0d0d12;
+    }
+
+    /* Creator Control Panel (Press 'H' to hide/show) */
+    #creator-panel {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      width: 292px;
+      max-height: calc(100vh - 28px);
+      overflow-y: auto;
+      background: rgba(14, 15, 23, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 14px;
+      padding: 14px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+      z-index: 100;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      font-size: 12px;
+    }
+
+    #creator-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(24px);
+    }
+
+    /* Floating Show UI Button (appears right where the panel hides) */
+    #btn-show-ui {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 105;
+      padding: 8px 13px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 243, 255, 0.45);
+      background: rgba(14, 15, 23, 0.88);
+      color: #00f3ff;
+      font-weight: 800;
+      font-size: 12px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(12px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #btn-show-ui.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .panel-title {
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: #00f3ff;
+    }
+
+    .hotkey-badge {
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 7px;
+      border-radius: 6px;
+      color: #c5cbe3;
+    }
+
+    .timer-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .timer-value {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 16px;
+      font-weight: 800;
+      color: #00f3ff;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 9px;
+    }
+
+    .control-group {
+      margin-bottom: 9px;
+    }
+
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #9da6c2;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    button {
+      flex: 1;
+      padding: 8px 10px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      transition: transform 0.1s ease, filter 0.15s ease;
+      color: #fff;
+      background: #25283a;
+    }
+
+    button:hover { filter: brightness(1.18); }
+    button:active { transform: scale(0.96); }
+    button.primary { background: linear-gradient(135deg, #00c3ff, #0066ff); }
+    button.danger { background: linear-gradient(135deg, #ff003c, #b5002b); }
+    button.accent { background: linear-gradient(135deg, #9d4edd, #5a189a); }
+    button.rec-on {
+      background: linear-gradient(135deg, #ff003c, #c8002f);
+      box-shadow: 0 0 14px rgba(255, 0, 60, 0.55);
+      animation: recPulse 1.2s infinite;
+    }
+
+    @keyframes recPulse {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.28); }
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #171925;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: #00f3ff;
+    }
+
+    /* Searchable Character Picker */
+    .char-picker {
+      position: relative;
+    }
+
+    .char-picker-btn {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #171925;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .char-picker-btn:hover {
+      border-color: #00f3ff;
+      filter: none;
+    }
+
+    .char-picker-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .char-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .char-picker-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #131520;
+      border: 1px solid rgba(0, 243, 255, 0.4);
+      border-radius: 9px;
+      padding: 6px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.85);
+      z-index: 250;
+      display: none;
+    }
+
+    .char-picker-menu.open {
+      display: block;
+    }
+
+    .char-picker-search {
+      margin-bottom: 6px;
+      font-size: 12px !important;
+      padding: 6px 8px !important;
+    }
+
+    .char-picker-list {
+      max-height: 175px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .char-picker-item {
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      color: #e4e9ff;
+      background: transparent;
+      text-align: left;
+    }
+
+    .char-picker-item:hover,
+    .char-picker-item.active {
+      background: rgba(0, 243, 255, 0.16);
+      color: #ffffff;
+    }
+
+    .char-picker-empty {
+      padding: 8px;
+      text-align: center;
+      font-size: 11px;
+      color: #7c85a6;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #00f3ff;
+      cursor: pointer;
+    }
+
+    .panel-footer {
+      font-size: 11px;
+      color: #7c85a6;
+      line-height: 1.45;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 8px;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 16, 24, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #dbe2ff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 200;
+    }
+
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="stage-wrapper">
+    <canvas id="arena-canvas" width="1080" height="1920"></canvas>
+  </div>
+
+  <!-- Creator Control Panel -->
+  <aside id="creator-panel">
+    <div class="panel-header">
+      <span class="panel-title">Creator Studio</span>
+      <span class="hotkey-badge">H: Hide UI</span>
+    </div>
+
+    <div class="timer-box">
+      <div>
+        <div style="font-size:10px; color:#9da6c2; text-transform:uppercase;">Match Timer</div>
+        <div style="font-size:10px; color:#7f89ab;">Sweet spot: 50s – 60s</div>
+      </div>
+      <div id="ui-timer" class="timer-value">00:00.0</div>
+    </div>
+
+    <div class="control-row">
+      <button id="btn-start" class="primary">▶ Start</button>
+      <button id="btn-restart" class="danger">↺ Restart</button>
+    </div>
+
+    <div class="control-row">
+      <button id="btn-record-toggle">🔴 Auto-Rec 1080p: OFF</button>
+      <button id="btn-hide-ui">👁 Hide UI</button>
+    </div>
+
+    <div class="control-row">
+      <button id="btn-random-match" class="accent">⚔️ Random Match</button>
+    </div>
+
+    <div class="control-row">
+      <button id="btn-random">🎲 New Seed</button>
+      <button id="btn-sfx">🔊 SFX: ON</button>
+    </div>
+
+    <div class="control-group">
+      <label>Fighter 1 (Left)</label>
+      <div id="picker-p1" class="char-picker"></div>
+    </div>
+
+    <div class="control-group">
+      <label for="input-avatar-p1">P1 Avatar URL (PNG/WebP)</label>
+      <input id="input-avatar-p1" type="text" placeholder="Optional: https://... (blank = Canvas art)" />
+    </div>
+
+    <div class="control-group">
+      <label>Fighter 2 (Right)</label>
+      <div id="picker-p2" class="char-picker"></div>
+    </div>
+
+    <div class="control-group">
+      <label for="input-avatar-p2">P2 Avatar URL (PNG/WebP)</label>
+      <input id="input-avatar-p2" type="text" placeholder="Optional: https://... (blank = Canvas art)" />
+    </div>
+
+    <div class="control-group">
+      <label for="input-seed"><span>Random Seed</span></label>
+      <input id="input-seed" type="text" value="7772026" placeholder="Enter seed..." />
+    </div>
+
+    <div class="control-group">
+      <label for="slider-speed">
+        <span>Game Speed</span>
+        <span id="label-speed" style="color:#fff;">1.0x</span>
+      </label>
+      <input id="slider-speed" type="range" min="0.5" max="2.5" step="0.25" value="1" />
+    </div>
+
+    <div class="panel-footer">
+      <b>Hotkeys:</b> <code>H</code> Hide/Show UI • <code>Space</code> Play/Pause • <code>R</code> Restart
+    </div>
+  </aside>
+
+  <button id="btn-show-ui" type="button">👁 Show UI</button>
+
+  <div id="toast">Creator Panel hidden — Press H to show</div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // =========================================================================
+      // 1. CONSTANTS & CANVAS CONFIGURATION (9:16 Vertical 1080x1920)
+      // =========================================================================
+      const CANVAS_W = 1080;
+      const CANVAS_H = 1920;
+      const ARENA_CX = CANVAS_W / 2;
+      const ARENA_CY = 1095;
+      const ARENA_INITIAL_RADIUS = 450;
+      const ARENA_MIN_RADIUS = 195;
+      const SHRINK_START_TIME = 22.0;    // Vòng bo thu hẹp sau 22 giây (nhịp đấu 50s - 60s)
+      const OVERDRIVE_START_TIME = 44.0; // Nhân đôi sát thương sau 44 giây để kết liễu kịch tính
+      const ARENA_SHRINK_RATE = 5.8;     // px/giây
+
+      const canvas = document.getElementById('arena-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Format damage neatly for 100 Max HP scale (e.g. 1.6, 4.2, 10)
+      function fmtDmg(v) {
+        if (v >= 10) return String(Math.round(v));
+        return String(Math.max(0.1, Number(v.toFixed(1))));
+      }
+
+      // =========================================================================
+      // 2. DETERMINISTIC PRNG (Mulberry32)
+      // =========================================================================
+      function hashSeed(str) {
+        let h = 2166136261 >>> 0;
+        const s = String(str);
+        for (let i = 0; i < s.length; i++) {
+          h ^= s.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+      }
+
+      function createRNG(seedStr) {
+        let a = hashSeed(seedStr);
+        return function () {
+          a |= 0;
+          a = (a + 0x6D2B79F5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      // =========================================================================
+      // 3. PROCEDURAL WEB AUDIO SFX ENGINE (Zero external audio files needed)
+      // =========================================================================
+      const SoundFX = {
+        enabled: true,
+        ctx: null,
+        dest: null,
+        masterBus: null,
+        keepAliveOsc: null,
+
+        ensure() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              this.ctx = new AudioCtx();
+              this.dest = this.ctx.createMediaStreamDestination();
+              this.masterBus = this.ctx.createGain();
+              this.masterBus.gain.value = 1.0;
+              this.masterBus.connect(this.ctx.destination);
+              this.masterBus.connect(this.dest);
+
+              // Luồng âm thanh giữ nhịp siêu nhỏ (không nghe thấy) để Chrome MediaRecorder
+              // không bao giờ bị ngắt hoặc lệch timestamp audio giữa các khoảng lặng SFX!
+              const osc = this.ctx.createOscillator();
+              const silentGain = this.ctx.createGain();
+              osc.frequency.value = 20;
+              silentGain.gain.value = 0.00005;
+              osc.connect(silentGain);
+              silentGain.connect(this.dest);
+              osc.start();
+              this.keepAliveOsc = osc;
+            }
+          }
+          if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+          return this.enabled ? this.ctx : null;
+        },
+
+        getAudioTracks() {
+          this.ensure();
+          return this.dest ? this.dest.stream.getAudioTracks() : [];
+        },
+
+        tone({ freq = 220, endFreq = 70, dur = 0.12, type = 'triangle', gain = 0.16 }) {
+          const ac = this.ensure();
+          if (!ac || !this.masterBus) return;
+          const now = ac.currentTime;
+          const osc = ac.createOscillator();
+          const g = ac.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + dur);
+          g.gain.setValueAtTime(gain, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+          osc.connect(g);
+          g.connect(this.masterBus);
+          osc.start(now);
+          osc.stop(now + dur);
+        },
+
+        wall(spd = 1) { this.tone({ freq: 140 + spd * 80, endFreq: 60, dur: 0.08, type: 'sine', gain: 0.1 }); },
+        hit(crit = false) { this.tone({ freq: crit ? 430 : 240, endFreq: 65, dur: crit ? 0.17 : 0.11, type: crit ? 'sawtooth' : 'triangle', gain: crit ? 0.21 : 0.15 }); },
+        block() { this.tone({ freq: 920, endFreq: 1440, dur: 0.16, type: 'sine', gain: 0.16 }); },
+        bluePull() { this.tone({ freq: 320, endFreq: 110, dur: 0.32, type: 'sine', gain: 0.15 }); },
+        redBlast() { this.tone({ freq: 520, endFreq: 55, dur: 0.3, type: 'sawtooth', gain: 0.24 }); },
+        slash() { this.tone({ freq: 980, endFreq: 210, dur: 0.1, type: 'sawtooth', gain: 0.14 }); },
+        ultimate() {
+          this.tone({ freq: 140, endFreq: 34, dur: 0.55, type: 'sawtooth', gain: 0.28 });
+          this.tone({ freq: 520, endFreq: 180, dur: 0.45, type: 'triangle', gain: 0.16 });
+        },
+        ko() {
+          this.tone({ freq: 150, endFreq: 24, dur: 0.85, type: 'sawtooth', gain: 0.32 });
+          this.tone({ freq: 360, endFreq: 42, dur: 0.6, type: 'square', gain: 0.14 });
+        }
+      };
+
+      // =========================================================================
+      // 4. CHARACTER CLASS & MODULAR CHARACTER DEFINITIONS
+      //    Mỗi nhân vật có: 1 Nội tại (passive) + 3 Chiêu thức (skill1, skill2, ultimate)
+      // =========================================================================
+      class Character {
+        constructor(config) {
+          this.id = config.id;
+          this.name = config.name;
+          this.avatarUrl = config.avatarUrl || '';
+          this.color = config.color;
+          this.secondaryColor = config.secondaryColor || config.color;
+          this.maxHp = config.maxHp || 1500;
+          this.attack = config.attack || 52;
+          this.defense = config.defense || 10;
+          this.speed = config.speed || 455;
+          this.critChance = config.critChance || 0.18;
+          this.critMult = config.critMult || 1.5;
+          this.radius = config.radius || 62;
+          this.skill1Cd = config.skill1Cd || 6.0;
+          this.skill2Cd = config.skill2Cd || 5.5;
+          this.skills = config.skills || {};
+          this.drawFallbackAvatar = config.drawFallbackAvatar;
+          this.drawCustomEffects = config.drawCustomEffects;
+
+          // Cache ảnh URL nếu người dùng cung cấp avatarUrl
+          this.avatarImg = null;
+          this.avatarLoaded = false;
+          if (this.avatarUrl) this.setAvatarUrl(this.avatarUrl);
+        }
+
+        setAvatarUrl(url) {
+          this.avatarUrl = (url || '').trim();
+          this.avatarImg = null;
+          this.avatarLoaded = false;
+          if (!this.avatarUrl) return;
+
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            this.avatarImg = img;
+            this.avatarLoaded = true;
+          };
+          img.onerror = () => {
+            this.avatarImg = null;
+            this.avatarLoaded = false;
+          };
+          img.src = this.avatarUrl;
+        }
+      }
+
+      // --- Character 1: GOJO SATORU ---
+      const GOJO_CONFIG = {
+        id: 'gojo',
+        name: 'GOJO SATORU',
+        avatarUrl: '',
+        color: '#00f3ff',
+        secondaryColor: '#b517ff',
+        maxHp: 100,
+        attack: 2.0,
+        defense: 0.55,
+        speed: 390,
+        critChance: 0.16,
+        critMult: 1.5,
+        radius: 62,
+        skill1Cd: 7.8,
+        skill2Cd: 7.5,
+        skills: {
+          // NỘI TẠI: Vô Hạ Hạn (Limitless Barrier) — Chặn 100% 1 đòn đánh, hồi lại sau 9 giây
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'init') {
+              self.custom.shieldActive = true;
+              self.custom.shieldTimer = 0;
+              self.custom.shieldCooldown = 9.0;
+            } else if (eventType === 'update') {
+              const dt = payload;
+              if (!self.custom.shieldActive) {
+                self.custom.shieldTimer += dt;
+                if (self.custom.shieldTimer >= self.custom.shieldCooldown) {
+                  self.custom.shieldActive = true;
+                  self.custom.shieldTimer = 0;
+                  arena.spawnRing(self.x, self.y, self.radius + 10, self.radius + 55, '#00f3ff', 0.35);
+                  arena.showFighterSkill(self, '[LIMITLESS READY!]', '#00f3ff');
+                }
+              }
+            } else if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (self.custom.shieldActive && !dmgInfo.isDot) {
+                self.custom.shieldActive = false;
+                self.custom.shieldTimer = 0;
+                dmgInfo.amount = 0;
+                dmgInfo.blocked = true;
+                SoundFX.block();
+                arena.spawnRing(self.x, self.y, self.radius + 12, self.radius + 90, '#00f3ff', 0.42);
+                arena.spawnParticles(self.x, self.y, '#00f3ff', 24, 380);
+                arena.showFighterSkill(self, '[INFINITY BLOCKED!]', '#00f3ff');
+              }
+            }
+          },
+
+          // CHIÊU 1: Thuật thức Thuận Chuyển: Thương (Lapse: Blue) — Tạo hố đen hút 1.5s & gây sát thương kéo
+          skill1(self, target, arena) {
+            SoundFX.bluePull();
+            arena.blueVortices.push({
+              owner: self,
+              target,
+              x: self.x,
+              y: self.y,
+              age: 0,
+              duration: 1.5,
+              tickAccum: 0
+            });
+            arena.spawnRing(self.x, self.y, 14, 130, '#0099ff', 0.45);
+            arena.showFighterSkill(self, '[LAPSE: BLUE!]', '#38b6ff');
+          },
+
+          // CHIÊU 2: Thuật thức Nghịch Chuyển: Hách (Reversal: Red) — Sóng xung kích đỏ hất văng đập tường
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            hitInfo.damage *= 1.38;
+            hitInfo.knockbackBoost = 2.4;
+            hitInfo.redSlam = true;
+            arena.addShake(16);
+            arena.triggerFlash('#ff1e56', 0.2);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 15, 220, '#ff1e56', 0.45);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#ff1e56', 32, 580);
+            arena.showFighterSkill(self, '[REVERSAL: RED!]', '#ff2a55');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Hư thức: Tử (Hollow Purple) — Tụ 0.5s rồi bắn quả cầu tím hủy diệt xuyên sàn
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'HOLLOW PURPLE!', '#c77dff');
+            arena.showFighterSkill(self, '[HOLLOW PURPLE!]', '#c77dff');
+            self.castFreeze = 0.5;
+            self.pendingUlt = {
+              delay: 0.5,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                self.bleedStacks = [];
+                self.domainSlowTimer = 0;
+                arena.domainEffect = null;
+
+                arena.projectiles.push({
+                  type: 'hollow_purple',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 30),
+                  y: self.y + uy * (self.radius + 30),
+                  vx: ux * 1050,
+                  vy: uy * 1050,
+                  radius: 76,
+                  color: '#c77dff',
+                  damage: 9.2,
+                  hit: false,
+                  life: 2.2
+                });
+
+                SoundFX.redBlast();
+                arena.addShake(24);
+                arena.triggerFlash('#b517ff', 0.3);
+                arena.spawnRing(self.x, self.y, 30, 240, '#c77dff', 0.5);
+                arena.spawnParticles(self.x, self.y, '#c77dff', 44, 620);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Tóc nhọn trắng vuốt lên + Bịt mắt đen + Six Eyes phát sáng
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          // Nền da & bóng ánh sáng xanh
+          const faceGrad = c.createRadialGradient(x, y + r * 0.15, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#fff5ec');
+          faceGrad.addColorStop(0.65, '#e8d5c8');
+          faceGrad.addColorStop(1, '#98b4c9');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          // Clip bên trong hình tròn
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tóc nhọn trắng vuốt dựng phía trên
+          c.fillStyle = '#f8fbff';
+          c.beginPath();
+          c.moveTo(x - r, y - r * 0.12);
+          c.lineTo(x - r * 0.72, y - r * 0.78);
+          c.lineTo(x - r * 0.45, y - r * 0.45);
+          c.lineTo(x - r * 0.22, y - r * 0.96);
+          c.lineTo(x, y - r * 0.52);
+          c.lineTo(x + r * 0.24, y - r * 0.98);
+          c.lineTo(x + r * 0.48, y - r * 0.46);
+          c.lineTo(x + r * 0.76, y - r * 0.8);
+          c.lineTo(x + r, y - r * 0.12);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Dải bịt mắt đen đặc trưng của Gojo
+          c.fillStyle = '#0c0d14';
+          c.fillRect(x - r, y - r * 0.22, r * 2, r * 0.42);
+
+          // Đôi mắt Six Eyes rực sáng xanh neon (sáng gấp đôi khi Awakening)
+          c.shadowColor = '#00f3ff';
+          c.shadowBlur = isAwakened ? 24 : 12;
+          c.fillStyle = isAwakened ? '#ffffff' : '#7ef9ff';
+          c.beginPath();
+          c.ellipse(x - r * 0.3, y - r * 0.01, r * 0.19, r * (isAwakened ? 0.11 : 0.08), 0, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.3, y - r * 0.01, r * 0.19, r * (isAwakened ? 0.11 : 0.08), 0, 0, Math.PI * 2);
+          c.fill();
+
+          // Nụ cười tự tin đặc trưng
+          c.shadowBlur = 0;
+          c.strokeStyle = '#1b1d28';
+          c.lineWidth = Math.max(2.5, r * 0.06);
+          c.lineCap = 'round';
+          c.beginPath();
+          c.arc(x, y + r * 0.34, r * 0.22, 0.15 * Math.PI, 0.85 * Math.PI);
+          c.stroke();
+
+          c.restore();
+        },
+
+        // Vẽ Khiên Lục Giác Vô Hạ Hạn (Hexagonal Limitless Barrier)
+        drawCustomEffects(c, self, time) {
+          if (self.custom.shieldActive) {
+            c.save();
+            c.translate(self.x, self.y);
+            c.rotate(time * 1.1);
+            const hexR = self.radius + 17;
+
+            c.strokeStyle = 'rgba(0, 243, 255, 0.95)';
+            c.fillStyle = 'rgba(0, 243, 255, 0.12)';
+            c.lineWidth = 4;
+            c.shadowColor = '#00f3ff';
+            c.shadowBlur = 22;
+
+            c.beginPath();
+            for (let i = 0; i < 6; i++) {
+              const a = (Math.PI / 3) * i;
+              const px = Math.cos(a) * hexR;
+              const py = Math.sin(a) * hexR;
+              if (i === 0) c.moveTo(px, py);
+              else c.lineTo(px, py);
+            }
+            c.closePath();
+            c.fill();
+            c.stroke();
+            c.restore();
+          }
+
+          // Hiệu ứng tụ 2 quả cầu Xanh + Đỏ khi đang charge Hollow Purple
+          if (self.castFreeze > 0) {
+            const p = 1 - self.castFreeze / 0.5;
+            const sep = (1 - p) * 58;
+            c.save();
+            c.shadowBlur = 24;
+            c.fillStyle = '#00b4ff';
+            c.shadowColor = '#00b4ff';
+            c.beginPath();
+            c.arc(self.x - sep, self.y, 18 + p * 10, 0, Math.PI * 2);
+            c.fill();
+
+            c.fillStyle = '#ff1e56';
+            c.shadowColor = '#ff1e56';
+            c.beginPath();
+            c.arc(self.x + sep, self.y, 18 + p * 10, 0, Math.PI * 2);
+            c.fill();
+            c.restore();
+          }
+        }
+      };
+
+      // --- Character 2: RYOMEN SUKUNA ---
+      const SUKUNA_CONFIG = {
+        id: 'sukuna',
+        name: 'RYOMEN SUKUNA',
+        avatarUrl: '',
+        color: '#ff003c',
+        secondaryColor: '#ff7b00',
+        maxHp: 100,
+        attack: 2.1,
+        defense: 0.48,
+        speed: 395,
+        critChance: 0.18,
+        critMult: 1.5,
+        radius: 62,
+        skill1Cd: 7.4,
+        skill2Cd: 7.5,
+        skills: {
+          // NỘI TẠI: Vua Lời Nguyền — Mọi đòn đánh gây Bleed 0.8% Max HP/giây trong 3s (cộng dồn tối đa 3 lần)
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'onHitSuccess') {
+              target.addBleedStack(self, target.maxHp * 0.008, 3.0, 3);
+            }
+          },
+
+          // CHIÊU 1: Bát (Dismantle) — Khi nảy tường, bắn 3 tia chém gió bay chéo sàn đấu
+          skill1(self, target, arena) {
+            SoundFX.slash();
+            const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
+            const angles = [-0.24, 0, 0.24];
+            for (const offset of angles) {
+              const a = baseAng + offset;
+              arena.projectiles.push({
+                type: 'dismantle',
+                owner: self,
+                target,
+                x: self.x + Math.cos(a) * (self.radius + 14),
+                y: self.y + Math.sin(a) * (self.radius + 14),
+                vx: Math.cos(a) * 900,
+                vy: Math.sin(a) * 900,
+                angle: a,
+                radius: 26,
+                color: '#ff2a55',
+                damage: 1.6,
+                hit: false,
+                life: 1.4
+              });
+            }
+            arena.showFighterSkill(self, '[DISMANTLE!]', '#ff4d6d');
+          },
+
+          // CHIÊU 2: Giải (Cleave) — Nhát chém cận chiến chí mạng tăng sát thương theo máu hiện tại của đối thủ
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.slash();
+            const hpScalingBonus = target.currentHp * 0.055;
+            hitInfo.damage = hitInfo.damage * 1.15 + hpScalingBonus;
+            hitInfo.isCrit = true;
+            arena.addShake(15);
+            arena.spawnSlash(target.x, target.y, '#ff003c', 120);
+            arena.spawnSlash(target.x, target.y, '#ffffff', 95);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#ff003c', 26, 500);
+            arena.showFighterSkill(self, '[CLEAVE!]', '#ff003c');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Bành trướng Lãnh địa — Phục Ma Ngự Thai Tử (Malevolent Shrine)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'DOMAIN EXPANSION!', '#ff003c');
+            arena.showFighterSkill(self, '[MALEVOLENT SHRINE!]', '#ff003c');
+
+            arena.domainEffect = {
+              owner: self,
+              target,
+              age: 0,
+              duration: 3.0,
+              slashAccum: 0,
+              dmgAccum: 0
+            };
+            target.domainSlowTimer = 3.0;
+          }
+        },
+
+        // Fallback Canvas Art: Tóc hồng dựng + Hoa văn ấn chú đen + 4 mắt đỏ phát sáng
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.15, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#ffe8dc');
+          faceGrad.addColorStop(0.65, '#e2b9aa');
+          faceGrad.addColorStop(1, '#7a2232');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tóc hồng dựng đặc trưng của Sukuna
+          c.fillStyle = '#ff6b8b';
+          c.beginPath();
+          c.moveTo(x - r, y - r * 0.16);
+          c.lineTo(x - r * 0.72, y - r * 0.86);
+          c.lineTo(x - r * 0.42, y - r * 0.48);
+          c.lineTo(x - r * 0.15, y - r * 0.96);
+          c.lineTo(x + r * 0.12, y - r * 0.48);
+          c.lineTo(x + r * 0.42, y - r * 0.94);
+          c.lineTo(x + r * 0.74, y - r * 0.5);
+          c.lineTo(x + r, y - r * 0.16);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Hoa văn ấn chú đen trên trán, sống mũi và má
+          c.strokeStyle = '#0e070b';
+          c.lineWidth = Math.max(3, r * 0.085);
+          c.lineCap = 'round';
+          c.beginPath();
+          // Ấn chú trán
+          c.moveTo(x - r * 0.34, y - r * 0.42);
+          c.lineTo(x + r * 0.34, y - r * 0.42);
+          // Vạch sống mũi
+          c.moveTo(x - r * 0.15, y + r * 0.06);
+          c.lineTo(x + r * 0.15, y + r * 0.06);
+          // Vạch má hai bên
+          c.moveTo(x - r * 0.68, y + r * 0.24);
+          c.lineTo(x - r * 0.38, y + r * 0.24);
+          c.moveTo(x + r * 0.38, y + r * 0.24);
+          c.lineTo(x + r * 0.68, y + r * 0.24);
+          c.stroke();
+
+          // 4 Đôi mắt đỏ rực (2 mắt trên + 2 mắt dưới đặc trưng của Sukuna)
+          c.shadowColor = '#ff003c';
+          c.shadowBlur = isAwakened ? 22 : 10;
+          c.fillStyle = isAwakened ? '#ffea00' : '#ff1e42';
+
+          // Mắt chính (trên)
+          c.beginPath();
+          c.ellipse(x - r * 0.32, y - r * 0.1, r * 0.15, r * 0.075, 0.18, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.32, y - r * 0.1, r * 0.15, r * 0.075, -0.18, 0, Math.PI * 2);
+          c.fill();
+
+          // Mắt phụ (dưới)
+          c.beginPath();
+          c.ellipse(x - r * 0.32, y + r * 0.1, r * 0.11, r * 0.055, 0.12, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.32, y + r * 0.1, r * 0.11, r * 0.055, -0.12, 0, Math.PI * 2);
+          c.fill();
+
+          // Nụ cười tà ác
+          c.shadowBlur = 0;
+          c.strokeStyle = '#18060c';
+          c.lineWidth = Math.max(2.5, r * 0.065);
+          c.beginPath();
+          c.arc(x, y + r * 0.36, r * 0.26, 0.1 * Math.PI, 0.9 * Math.PI);
+          c.stroke();
+
+          c.restore();
+        },
+
+        drawCustomEffects(c, self, time) {
+          // Tia lửa nguyền quanh người khi dưới 30% HP
+          if (self.isAwakened) {
+            c.save();
+            const pulse = 18 + Math.sin(time * 20) * 6;
+            const aura = c.createRadialGradient(self.x, self.y, self.radius * 0.8, self.x, self.y, self.radius + pulse + 22);
+            aura.addColorStop(0, 'rgba(255, 0, 60, 0.72)');
+            aura.addColorStop(0.6, 'rgba(255, 110, 0, 0.3)');
+            aura.addColorStop(1, 'rgba(255, 0, 60, 0)');
+            c.fillStyle = aura;
+            c.beginPath();
+            c.arc(self.x, self.y, self.radius + pulse + 22, 0, Math.PI * 2);
+            c.fill();
+            c.restore();
+          }
+        }
+      };
+
+      // --- Character 3: NARUTO UZUMAKI ---
+      const NARUTO_CONFIG = {
+        id: 'naruto',
+        name: 'NARUTO UZUMAKI',
+        avatarUrl: '',
+        color: '#ff9100',
+        secondaryColor: '#ffe600',
+        maxHp: 100,
+        attack: 1.95,
+        defense: 0.52,
+        speed: 395,
+        critChance: 0.17,
+        critMult: 1.5,
+        radius: 62,
+        skill1Cd: 7.4,
+        skill2Cd: 7.2,
+        skills: {
+          // NỘI TẠI: Hồi phục Cửu Vĩ (Kurama Regeneration) — Hồi 0.55 HP/s (1.1 HP/s khi Awakening)
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'init') {
+              self.custom.regenAccum = 0;
+            } else if (eventType === 'update') {
+              const dt = payload;
+              if (self.currentHp > 0 && self.currentHp < self.maxHp) {
+                const regenPerSec = self.isAwakened ? 1.1 : 0.55;
+                self.currentHp = Math.min(self.maxHp, self.currentHp + regenPerSec * dt);
+                self.custom.regenAccum += dt;
+                if (self.custom.regenAccum >= 2.0) {
+                  self.custom.regenAccum = 0;
+                  arena.spawnFloatingText(self.x, self.y - self.radius - 10, `+${fmtDmg(regenPerSec * 2.0)} HP`, '#38ff7a', 22);
+                }
+              }
+            }
+          },
+
+          // CHIÊU 1: Ảnh Phân Thân (Shadow Clone Jutsu)
+          skill1(self, target, arena) {
+            SoundFX.bluePull();
+            const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
+            for (const offset of [-0.28, 0.28]) {
+              const a = baseAng + offset;
+              arena.projectiles.push({
+                type: 'shadow_clone',
+                owner: self,
+                target,
+                x: self.x + Math.cos(a) * (self.radius + 16),
+                y: self.y + Math.sin(a) * (self.radius + 16),
+                vx: Math.cos(a) * 760,
+                vy: Math.sin(a) * 760,
+                radius: 30,
+                color: '#ff9100',
+                damage: 2.0,
+                hit: false,
+                life: 1.7
+              });
+            }
+            arena.spawnParticles(self.x, self.y, '#ffffff', 16, 260);
+            arena.showFighterSkill(self, '[SHADOW CLONE JUTSU!]', '#ffb703');
+          },
+
+          // CHIÊU 2: Loa Toàn Hoàn (Rasengan)
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            hitInfo.damage *= 1.55;
+            hitInfo.knockbackBoost = 2.15;
+            hitInfo.isCrit = true;
+            arena.addShake(16);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 12, 185, '#00e5ff', 0.42);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#6ef7ff', 30, 520);
+            arena.showFighterSkill(self, '[RASENGAN!]', '#00e5ff');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Bom Vĩ Thú (Tailed Beast Bomb / Bijuu Dama)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'TAILED BEAST BOMB!', '#ff6d00');
+            arena.showFighterSkill(self, '[TAILED BEAST BOMB!]', '#ff6d00');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'bijuu_dama',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 34),
+                  y: self.y + uy * (self.radius + 34),
+                  vx: ux * 980,
+                  vy: uy * 980,
+                  radius: 74,
+                  color: '#ff5400',
+                  damage: 9.5,
+                  hit: false,
+                  life: 2.2
+                });
+
+                SoundFX.redBlast();
+                arena.addShake(26);
+                arena.triggerFlash('#ff6d00', 0.32);
+                arena.spawnRing(self.x, self.y, 28, 250, '#ff6d00', 0.5);
+                arena.spawnParticles(self.x, self.y, '#ff9100', 44, 620);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Tóc vàng dựng + Băng trán Konoha + 3 vệt râu mèo + Mắt xanh/Cửu Vĩ
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.12, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, isAwakened ? '#ffe0b2' : '#fff0db');
+          faceGrad.addColorStop(0.68, isAwakened ? '#ffb74d' : '#e8c49e');
+          faceGrad.addColorStop(1, '#c46d1f');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tóc vàng nhọn dựng
+          c.fillStyle = isAwakened ? '#fff176' : '#ffd60a';
+          c.beginPath();
+          c.moveTo(x - r, y - r * 0.25);
+          c.lineTo(x - r * 0.72, y - r * 0.88);
+          c.lineTo(x - r * 0.42, y - r * 0.54);
+          c.lineTo(x - r * 0.14, y - r * 0.98);
+          c.lineTo(x + r * 0.12, y - r * 0.52);
+          c.lineTo(x + r * 0.42, y - r * 0.96);
+          c.lineTo(x + r * 0.72, y - r * 0.55);
+          c.lineTo(x + r, y - r * 0.25);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Băng trán Konoha màu xanh đen + miếng kim loại xám
+          c.fillStyle = '#1b263b';
+          c.fillRect(x - r, y - r * 0.48, r * 2, r * 0.24);
+          c.fillStyle = '#adb5bd';
+          c.fillRect(x - r * 0.36, y - r * 0.45, r * 0.72, r * 0.18);
+
+          // Đôi mắt xanh dương (chuyển sang mắt Cửu Vĩ đỏ cam khi Awakening)
+          c.shadowColor = isAwakened ? '#ff3d00' : '#00b4ff';
+          c.shadowBlur = isAwakened ? 18 : 8;
+          c.fillStyle = isAwakened ? '#ff3d00' : '#00b4ff';
+          c.beginPath();
+          c.ellipse(x - r * 0.3, y - r * 0.04, r * 0.15, r * 0.1, 0, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.3, y - r * 0.04, r * 0.15, r * 0.1, 0, 0, Math.PI * 2);
+          c.fill();
+
+          // 3 vệt râu mèo mỗi bên má
+          c.shadowBlur = 0;
+          c.strokeStyle = '#3d251e';
+          c.lineWidth = Math.max(2.2, r * 0.055);
+          c.lineCap = 'round';
+          for (const dy of [0.14, 0.24, 0.34]) {
+            c.beginPath();
+            c.moveTo(x - r * 0.68, y + r * dy);
+            c.lineTo(x - r * 0.38, y + r * (dy - 0.02));
+            c.moveTo(x + r * 0.38, y + r * (dy - 0.02));
+            c.lineTo(x + r * 0.68, y + r * dy);
+            c.stroke();
+          }
+
+          // Nụ cười tự tin
+          c.strokeStyle = '#221510';
+          c.lineWidth = Math.max(2.5, r * 0.06);
+          c.beginPath();
+          c.arc(x, y + r * 0.36, r * 0.22, 0.12 * Math.PI, 0.88 * Math.PI);
+          c.stroke();
+          c.restore();
+        },
+
+        drawCustomEffects(c, self, time) {
+          // Aura Chakra Cửu Vĩ vàng cam rực sáng khi Awakening
+          if (self.isAwakened) {
+            c.save();
+            const pulse = 16 + Math.sin(time * 16) * 6;
+            const aura = c.createRadialGradient(self.x, self.y, self.radius * 0.85, self.x, self.y, self.radius + pulse + 22);
+            aura.addColorStop(0, 'rgba(255, 160, 0, 0.72)');
+            aura.addColorStop(0.6, 'rgba(255, 230, 0, 0.32)');
+            aura.addColorStop(1, 'rgba(255, 100, 0, 0)');
+            c.fillStyle = aura;
+            c.beginPath();
+            c.arc(self.x, self.y, self.radius + pulse + 22, 0, Math.PI * 2);
+            c.fill();
+            c.restore();
+          }
+        }
+      };
+
+      // --- Character 4: MONKEY D. LUFFY ---
+      const LUFFY_CONFIG = {
+        id: 'luffy',
+        name: 'MONKEY D. LUFFY',
+        avatarUrl: '',
+        color: '#ff3b30',
+        secondaryColor: '#ffffff',
+        maxHp: 100,
+        attack: 2.0,
+        defense: 0.55,
+        speed: 400,
+        critChance: 0.18,
+        critMult: 1.55,
+        radius: 62,
+        skill1Cd: 7.2,
+        skill2Cd: 7.4,
+        skills: {
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (!dmgInfo.isDot) dmgInfo.amount *= 0.78;
+            } else if (eventType === 'onWallBounce') {
+              self.speedBoostTimer = 1.8;
+            }
+          },
+
+          skill1(self, target, arena) {
+            SoundFX.slash();
+            const ang = Math.atan2(target.y - self.y, target.x - self.x);
+            arena.projectiles.push({
+              type: 'jet_pistol',
+              owner: self,
+              target,
+              x: self.x + Math.cos(ang) * (self.radius + 18),
+              y: self.y + Math.sin(ang) * (self.radius + 18),
+              vx: Math.cos(ang) * 1120,
+              vy: Math.sin(ang) * 1120,
+              angle: ang,
+              radius: 34,
+              color: '#ff3b30',
+              damage: 3.1,
+              hit: false,
+              life: 1.3
+            });
+            arena.showFighterSkill(self, '[JET PISTOL!]', '#ff595e');
+          },
+
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            hitInfo.damage *= 1.45;
+            hitInfo.isCrit = true;
+            target.addBleedStack(self, target.maxHp * 0.009, 2.5, 2);
+            arena.addShake(16);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 15, 195, '#ff5400', 0.42);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#ff6d00', 34, 540);
+            arena.showFighterSkill(self, '[RED HAWK!]', '#ff6d00');
+          },
+
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'GEAR 5: BAJRANG GUN!', '#ffffff');
+            arena.showFighterSkill(self, '[GEAR 5: BAJRANG GUN!]', '#ffffff');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'bajrang_gun',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 36),
+                  y: self.y + uy * (self.radius + 36),
+                  vx: ux * 960,
+                  vy: uy * 960,
+                  radius: 82,
+                  color: '#ffffff',
+                  damage: 9.8,
+                  hit: false,
+                  life: 2.2
+                });
+
+                SoundFX.redBlast();
+                arena.addShake(28);
+                arena.triggerFlash('#ffffff', 0.36);
+                arena.spawnRing(self.x, self.y, 26, 260, '#ffffff', 0.5);
+                arena.spawnParticles(self.x, self.y, '#ffffff', 46, 640);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Mũ rơm vàng + Ruy băng đỏ + Vết sẹo dưới mắt trái + Nụ cười Gear 5
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.15, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#fff3e2');
+          faceGrad.addColorStop(0.68, '#e8c4a0');
+          faceGrad.addColorStop(1, isAwakened ? '#d8e2ff' : '#9e382e');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Mũ rơm vàng đặc trưng (hoặc tóc mây trắng bồng bềnh khi Gear 5 Awakening)
+          if (isAwakened) {
+            c.fillStyle = '#ffffff';
+            c.shadowColor = '#ffffff';
+            c.shadowBlur = 14;
+            for (const [ox, oy, cr] of [[-0.55, -0.58, 0.42], [0, -0.72, 0.48], [0.55, -0.58, 0.42]]) {
+              c.beginPath();
+              c.arc(x + r * ox, y + r * oy, r * cr, 0, Math.PI * 2);
+              c.fill();
+            }
+            c.shadowBlur = 0;
+          } else {
+            // Chỏm mũ rơm vàng
+            c.fillStyle = '#f4c430';
+            c.fillRect(x - r, y - r * 1.1, r * 2, r * 0.72);
+            // Dải ruy băng đỏ quanh mũ
+            c.fillStyle = '#d90429';
+            c.fillRect(x - r, y - r * 0.46, r * 2, r * 0.14);
+            // Tóc đen lòa xòa dưới vành mũ
+            c.fillStyle = '#141418';
+            c.beginPath();
+            c.moveTo(x - r, y - r * 0.32);
+            c.lineTo(x - r * 0.45, y - r * 0.14);
+            c.lineTo(x, y - r * 0.28);
+            c.lineTo(x + r * 0.45, y - r * 0.14);
+            c.lineTo(x + r, y - r * 0.32);
+            c.lineTo(x + r, y - r * 0.36);
+            c.lineTo(x - r, y - r * 0.36);
+            c.closePath();
+            c.fill();
+          }
+
+          // Đôi mắt to tròn (ánh đỏ/trắng rực khi Gear 5)
+          c.fillStyle = isAwakened ? '#ff2a55' : '#111116';
+          c.beginPath();
+          c.arc(x - r * 0.28, y - r * 0.02, r * 0.1, 0, Math.PI * 2);
+          c.arc(x + r * 0.28, y - r * 0.02, r * 0.1, 0, Math.PI * 2);
+          c.fill();
+
+          // Vết sẹo khâu đặc trưng dưới mắt trái
+          c.strokeStyle = '#5c1a1b';
+          c.lineWidth = Math.max(2, r * 0.05);
+          c.beginPath();
+          c.moveTo(x - r * 0.42, y + r * 0.14);
+          c.lineTo(x - r * 0.16, y + r * 0.14);
+          c.stroke();
+
+          // Nụ cười răng trắng toe toét đặc trưng của Luffy
+          c.fillStyle = '#ffffff';
+          c.strokeStyle = '#1b1414';
+          c.lineWidth = Math.max(2.5, r * 0.055);
+          c.beginPath();
+          c.arc(x, y + r * 0.3, r * 0.34, 0.08 * Math.PI, 0.92 * Math.PI);
+          c.closePath();
+          c.fill();
+          c.stroke();
+          c.restore();
+        },
+
+        drawCustomEffects(c, self, time) {
+          // Mây trắng Gear 5 xoay quanh thân khi Awakening
+          if (self.isAwakened) {
+            c.save();
+            c.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            c.lineWidth = 6;
+            c.shadowColor = '#ffffff';
+            c.shadowBlur = 24;
+            c.setLineDash([22, 14]);
+            c.beginPath();
+            c.arc(self.x, self.y, self.radius + 16, time * 2.5, time * 2.5 + Math.PI * 2);
+            c.stroke();
+            c.restore();
+          }
+        }
+      };
+
+      // --- Character 5: EREN YEAGER ---
+      const EREN_CONFIG = {
+        id: 'eren',
+        name: 'EREN YEAGER',
+        avatarUrl: '',
+        color: '#2ec4b6',
+        secondaryColor: '#e63946',
+        maxHp: 100,
+        attack: 2.05,
+        defense: 0.5,
+        speed: 392,
+        critChance: 0.18,
+        critMult: 1.55,
+        radius: 62,
+        skill1Cd: 7.4,
+        skill2Cd: 7.3,
+        skills: {
+          // NỘI TẠI: Tái Tạo Titan (Titan Regeneration) — Hồi lại 20% sát thương vừa nhận & tăng dame khi mất máu
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'init') {
+              self.custom.regenPool = 0;
+              self.custom.regenTick = 0;
+            } else if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (!dmgInfo.blocked && dmgInfo.amount > 0) {
+                self.custom.regenPool += dmgInfo.amount * 0.2;
+              }
+            } else if (eventType === 'update') {
+              const dt = payload;
+              if (self.custom.regenPool > 0.05 && self.currentHp > 0) {
+                const heal = Math.min(self.custom.regenPool, 1.4 * dt);
+                self.custom.regenPool -= heal;
+                self.currentHp = Math.min(self.maxHp, self.currentHp + heal);
+                self.custom.regenTick += dt;
+                if (self.custom.regenTick >= 1.6) {
+                  self.custom.regenTick = 0;
+                  arena.spawnParticles(self.x, self.y, '#2ec4b6', 6, 140);
+                }
+              }
+            }
+          },
+
+          // CHIÊU 1: Cọc Gai Búa Chiến (Warhammer Spikes) — Bắn 3 mũi gai pha lê xuyên giáp khi nảy tường
+          skill1(self, target, arena) {
+            SoundFX.slash();
+            const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
+            for (const off of [-0.22, 0, 0.22]) {
+              const a = baseAng + off;
+              arena.projectiles.push({
+                type: 'warhammer_spike',
+                owner: self,
+                target,
+                x: self.x + Math.cos(a) * (self.radius + 16),
+                y: self.y + Math.sin(a) * (self.radius + 16),
+                vx: Math.cos(a) * 960,
+                vy: Math.sin(a) * 960,
+                angle: a,
+                radius: 26,
+                color: '#d8f3ff',
+                damage: 1.75,
+                hit: false,
+                life: 1.4
+              });
+            }
+            arena.showFighterSkill(self, '[WARHAMMER SPIKES!]', '#a8e6ff');
+          },
+
+          // CHIÊU 2: Đấm Hóa Cứng (Hardening Punch) — Cận chiến pha lê xanh gây dame lớn + hất văng
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            hitInfo.damage *= 1.55;
+            hitInfo.knockbackBoost = 2.2;
+            hitInfo.isCrit = true;
+            arena.addShake(16);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 15, 190, '#2ec4b6', 0.4);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#9bf6ff', 30, 500);
+            arena.showFighterSkill(self, '[HARDENING PUNCH!]', '#2ec4b6');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Rung Chấn (The Rumbling) — Triệu hồi làn sóng Titan Khổng Lồ càn quét
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'THE RUMBLING!', '#e63946');
+            arena.showFighterSkill(self, '[THE RUMBLING!]', '#e63946');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'rumbling_wave',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 32),
+                  y: self.y + uy * (self.radius + 32),
+                  vx: ux * 880,
+                  vy: uy * 880,
+                  radius: 84,
+                  color: '#e63946',
+                  damage: 9.6,
+                  hit: false,
+                  life: 2.3
+                });
+                target.addBleedStack(self, target.maxHp * 0.01, 3.0, 2);
+                SoundFX.redBlast();
+                arena.addShake(28);
+                arena.triggerFlash('#e63946', 0.34);
+                arena.spawnRing(self.x, self.y, 28, 270, '#e63946', 0.55);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Tóc nâu dài rẽ ngôi S4 + Mắt xanh ngọc Titan + Vết sẹo Titan dưới mắt
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.14, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#fff1e6');
+          faceGrad.addColorStop(0.7, '#d9b8a3');
+          faceGrad.addColorStop(1, '#4a2c2a');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tóc nâu đậm rẽ ngôi dài ôm 2 bên má
+          c.fillStyle = '#2b1d1a';
+          c.beginPath();
+          c.moveTo(x - r, y + r * 0.4);
+          c.lineTo(x - r * 0.72, y - r * 0.25);
+          c.lineTo(x, y - r * 0.58);
+          c.lineTo(x + r * 0.72, y - r * 0.25);
+          c.lineTo(x + r, y + r * 0.4);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Đôi mắt xanh ngọc bích phát sáng
+          c.shadowColor = isAwakened ? '#00ffaa' : '#2ec4b6';
+          c.shadowBlur = isAwakened ? 22 : 12;
+          c.fillStyle = isAwakened ? '#64ffda' : '#2ec4b6';
+          c.beginPath();
+          c.ellipse(x - r * 0.28, y - r * 0.04, r * 0.15, r * 0.085, 0.1, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.28, y - r * 0.04, r * 0.15, r * 0.085, -0.1, 0, Math.PI * 2);
+          c.fill();
+
+          // Vết sẹo Titan kẻ dọc dưới mắt
+          c.shadowBlur = 0;
+          c.strokeStyle = '#9b2226';
+          c.lineWidth = Math.max(2, r * 0.05);
+          c.beginPath();
+          c.moveTo(x - r * 0.34, y + r * 0.08);
+          c.lineTo(x - r * 0.26, y + r * 0.34);
+          c.moveTo(x + r * 0.34, y + r * 0.08);
+          c.lineTo(x + r * 0.26, y + r * 0.34);
+          c.stroke();
+
+          // Biểu cảm lạnh lùng kiên định
+          c.strokeStyle = '#241414';
+          c.lineWidth = Math.max(2.5, r * 0.055);
+          c.beginPath();
+          c.moveTo(x - r * 0.2, y + r * 0.4);
+          c.lineTo(x + r * 0.2, y + r * 0.4);
+          c.stroke();
+          c.restore();
+        },
+
+        drawCustomEffects(c, self, time) {
+          if (self.isAwakened) {
+            c.save();
+            c.strokeStyle = '#2ec4b6';
+            c.lineWidth = 4;
+            c.shadowColor = '#00ffaa';
+            c.shadowBlur = 24;
+            c.beginPath();
+            c.arc(self.x, self.y, self.radius + 14 + Math.sin(time * 16) * 4, 0, Math.PI * 2);
+            c.stroke();
+            c.restore();
+          }
+        }
+      };
+
+      // --- Character 6: LEVI ACKERMAN ---
+      const LEVI_CONFIG = {
+        id: 'levi',
+        name: 'LEVI ACKERMAN',
+        avatarUrl: '',
+        color: '#00b4d8',
+        secondaryColor: '#e0fbfc',
+        maxHp: 100,
+        attack: 1.95,
+        defense: 0.48,
+        speed: 428, // Nhanh nhất sàn đấu
+        critChance: 0.24,
+        critMult: 1.55,
+        radius: 60,
+        skill1Cd: 6.8,
+        skill2Cd: 7.0,
+        skills: {
+          // NỘI TẠI: Phản Xạ Ackerman — 22% tỷ lệ Né Tránh hoàn toàn đòn đánh trực tiếp (DODGE!)
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (!dmgInfo.isDot && arena.rng() < 0.22) {
+                dmgInfo.amount = 0;
+                dmgInfo.blocked = true;
+                SoundFX.block();
+                arena.spawnParticles(self.x, self.y, '#e0fbfc', 16, 360);
+                arena.showFighterSkill(self, '[ACKERMAN DODGE!]', '#90e0ef');
+              }
+            }
+          },
+
+          // CHIÊU 1: Bộ Cơ Động 3D (ODM Grapple Dash) — Phóng dây móc lao cực nhanh về phía đối thủ
+          skill1(self, target, arena) {
+            SoundFX.slash();
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            self.vx = (dx / d) * 680;
+            self.vy = (dy / d) * 680;
+            self.speedBoostTimer = 1.6;
+            arena.spawnSlash(self.x, self.y, '#e0fbfc', 130);
+            arena.spawnParticles(self.x, self.y, '#90e0ef', 18, 340);
+            arena.showFighterSkill(self, '[ODM GRAPPLE DASH!]', '#00b4d8');
+          },
+
+          // CHIÊU 2: Xoáy Chém Tốc Độ Cao (Spin Slash) — Chém liên hoàn cực nhanh tạo nhiều vết chém bạc
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.slash();
+            hitInfo.damage *= 1.65;
+            hitInfo.isCrit = true;
+            arena.addShake(15);
+            for (let k = 0; k < 4; k++) {
+              arena.spawnSlash(target.x + (Math.random() - 0.5) * 40, target.y + (Math.random() - 0.5) * 40, '#e0fbfc', 115);
+            }
+            arena.spawnRing(target.x, target.y, 18, 165, '#90e0ef', 0.35);
+            arena.showFighterSkill(self, '[SPINNING SLASH!]', '#e0fbfc');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Loạt Thương Sét (Thunder Spear Barrage) — Bắn 4 mũi thương sét phát nổ
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'THUNDER SPEARS!', '#ffd60a');
+            arena.showFighterSkill(self, '[THUNDER SPEAR BARRAGE!]', '#ffd60a');
+
+            const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
+            for (const off of [-0.3, -0.1, 0.1, 0.3]) {
+              const a = baseAng + off;
+              arena.projectiles.push({
+                type: 'thunder_spear',
+                owner: self,
+                target,
+                x: self.x + Math.cos(a) * (self.radius + 16),
+                y: self.y + Math.sin(a) * (self.radius + 16),
+                vx: Math.cos(a) * 1080,
+                vy: Math.sin(a) * 1080,
+                angle: a,
+                radius: 30,
+                color: '#ffd60a',
+                damage: 3.1,
+                hit: false,
+                life: 1.6
+              });
+            }
+            arena.addShake(22);
+          }
+        },
+
+        // Fallback Canvas Art: Tóc đen Undercut + Mắt xám sắc lạnh + Khăn quàng cổ trắng Trinh Sát
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.12, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#f8f9fa');
+          faceGrad.addColorStop(0.7, '#dce1e8');
+          faceGrad.addColorStop(1, '#5c677d');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tóc đen undercut đặc trưng
+          c.fillStyle = '#0d0f14';
+          c.beginPath();
+          c.moveTo(x - r, y - r * 0.12);
+          c.lineTo(x - r * 0.55, y - r * 0.32);
+          c.lineTo(x - r * 0.2, y - r * 0.14);
+          c.lineTo(x, y - r * 0.36);
+          c.lineTo(x + r * 0.25, y - r * 0.14);
+          c.lineTo(x + r * 0.6, y - r * 0.3);
+          c.lineTo(x + r, y - r * 0.12);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Mắt xám lạnh lùng hẹp ngang
+          c.shadowColor = '#90e0ef';
+          c.shadowBlur = isAwakened ? 18 : 6;
+          c.fillStyle = isAwakened ? '#00f3ff' : '#33415c';
+          c.fillRect(x - r * 0.44, y - r * 0.04, r * 0.28, r * 0.1);
+          c.fillRect(x + r * 0.16, y - r * 0.04, r * 0.28, r * 0.1);
+
+          // Khăn quàng cổ trắng (Cravat) phía dưới
+          c.shadowBlur = 0;
+          c.fillStyle = '#ffffff';
+          c.beginPath();
+          c.moveTo(x - r * 0.5, y + r * 0.58);
+          c.lineTo(x + r * 0.5, y + r * 0.58);
+          c.lineTo(x + r * 0.7, y + r * 1.1);
+          c.lineTo(x - r * 0.7, y + r * 1.1);
+          c.closePath();
+          c.fill();
+          c.restore();
+        }
+      };
+
+      // --- Character 7: DORAEMON ---
+      const DORAEMON_CONFIG = {
+        id: 'doraemon',
+        name: 'DORAEMON',
+        avatarUrl: '',
+        color: '#0096ff',
+        secondaryColor: '#ffd60a',
+        maxHp: 100,
+        attack: 1.9,
+        defense: 0.56,
+        speed: 388,
+        critChance: 0.16,
+        critMult: 1.5,
+        radius: 62,
+        skill1Cd: 7.2,
+        skill2Cd: 7.4,
+        skills: {
+          // NỘI TẠI: Túi Thần Kỳ 4 Chiều — Mỗi 8.5s tự rút ngẫu nhiên Bánh Rán (+5 HP) / Chong Chóng Tre / Khăn Trùm
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'init') {
+              self.custom.pocketTimer = 3.0;
+              self.custom.timeCloth = false;
+            } else if (eventType === 'update') {
+              self.custom.pocketTimer += payload;
+              if (self.custom.pocketTimer >= 8.5) {
+                self.custom.pocketTimer = 0;
+                const roll = arena.rng();
+                if (roll < 0.45) {
+                  self.currentHp = Math.min(self.maxHp, self.currentHp + 5.5);
+                  arena.spawnFloatingText(self.x, self.y - self.radius - 10, '+5.5 DORAYAKI', '#ffd60a', 24);
+                  arena.showFighterSkill(self, '[4D POCKET: DORAYAKI!]', '#ffd60a');
+                } else if (roll < 0.75) {
+                  self.speedBoostTimer = 2.6;
+                  arena.showFighterSkill(self, '[BAMBOO COPTER!]', '#38b6ff');
+                } else {
+                  self.custom.timeCloth = true;
+                  arena.showFighterSkill(self, '[TIME CLOTH READY!]', '#00f5d4');
+                }
+              }
+            } else if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (self.custom.timeCloth && !dmgInfo.isDot) {
+                self.custom.timeCloth = false;
+                dmgInfo.amount = 0;
+                dmgInfo.blocked = true;
+                SoundFX.block();
+                arena.spawnRing(self.x, self.y, self.radius + 10, self.radius + 75, '#00f5d4', 0.4);
+                arena.showFighterSkill(self, '[TIME CLOTH BLOCKED!]', '#00f5d4');
+              }
+            }
+          },
+
+          // CHIÊU 1: Đại Bác Không Khí (Air Cannon) — Bắn vòng sóng khí nén đẩy lùi mạnh khi nảy tường
+          skill1(self, target, arena) {
+            SoundFX.bluePull();
+            const ang = Math.atan2(target.y - self.y, target.x - self.x);
+            arena.projectiles.push({
+              type: 'air_cannon',
+              owner: self,
+              target,
+              x: self.x + Math.cos(ang) * (self.radius + 16),
+              y: self.y + Math.sin(ang) * (self.radius + 16),
+              vx: Math.cos(ang) * 980,
+              vy: Math.sin(ang) * 980,
+              angle: ang,
+              radius: 36,
+              color: '#80edff',
+              damage: 3.0,
+              hit: false,
+              life: 1.5
+            });
+            arena.showFighterSkill(self, '[AIR CANNON!]', '#80edff');
+          },
+
+          // CHIÊU 2: Đèn Pin Thu Nhỏ (Small Light) — Giảm 28% sát thương của đối thủ trong 3.5 giây
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.block();
+            hitInfo.damage *= 1.3;
+            target.damageDebuffTimer = 3.5;
+            arena.spawnRing(target.x, target.y, 15, 160, '#ffd60a', 0.4);
+            arena.spawnParticles(target.x, target.y, '#ffd60a', 22, 340);
+            arena.showFighterSkill(self, '[SMALL LIGHT!]', '#ffd60a');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Đại Bác Năng Lượng 22nd Century (Super Air Beam)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, '22ND CENTURY BEAM!', '#0096ff');
+            arena.showFighterSkill(self, '[22ND CENTURY BEAM!]', '#00d9ff');
+            self.castFreeze = 0.4;
+            self.pendingUlt = {
+              delay: 0.4,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'dora_beam',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 34),
+                  y: self.y + uy * (self.radius + 34),
+                  vx: ux * 1060,
+                  vy: uy * 1060,
+                  radius: 76,
+                  color: '#00d9ff',
+                  damage: 9.4,
+                  hit: false,
+                  life: 2.2
+                });
+                SoundFX.redBlast();
+                arena.addShake(25);
+                arena.triggerFlash('#00d9ff', 0.3);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Đầu tròn xanh Doraemon + Mặt trắng + Mũi đỏ + 6 Râu + Chuông vàng
+        drawFallbackAvatar(c, x, y, r) {
+          c.save();
+          // Nền xanh dương Doraemon
+          c.fillStyle = '#0096ff';
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Phần mặt trắng tròn bên dưới
+          c.fillStyle = '#ffffff';
+          c.beginPath();
+          c.arc(x, y + r * 0.2, r * 0.82, 0, Math.PI * 2);
+          c.fill();
+
+          // Đôi mắt trắng to sát nhau
+          c.fillStyle = '#ffffff';
+          c.strokeStyle = '#111';
+          c.lineWidth = 2.5;
+          c.beginPath();
+          c.ellipse(x - r * 0.17, y - r * 0.26, r * 0.17, r * 0.22, 0, 0, Math.PI * 2);
+          c.fill(); c.stroke();
+          c.beginPath();
+          c.ellipse(x + r * 0.17, y - r * 0.26, r * 0.17, r * 0.22, 0, 0, Math.PI * 2);
+          c.fill(); c.stroke();
+
+          // Con ngươi đen
+          c.fillStyle = '#111';
+          c.beginPath();
+          c.arc(x - r * 0.1, y - r * 0.24, r * 0.06, 0, Math.PI * 2);
+          c.arc(x + r * 0.1, y - r * 0.24, r * 0.06, 0, Math.PI * 2);
+          c.fill();
+
+          // Chiếc mũi đỏ bóng
+          c.fillStyle = '#e63946';
+          c.beginPath();
+          c.arc(x, y - r * 0.04, r * 0.13, 0, Math.PI * 2);
+          c.fill();
+
+          // Râu mèo 3 sợi mỗi bên + Miệng cười
+          c.strokeStyle = '#111';
+          c.lineWidth = 2.4;
+          c.beginPath();
+          c.moveTo(x, y + r * 0.09);
+          c.lineTo(x, y + r * 0.36);
+          c.arc(x, y + r * 0.12, r * 0.34, 0.2 * Math.PI, 0.8 * Math.PI);
+          for (const dy of [-0.02, 0.1, 0.22]) {
+            c.moveTo(x - r * 0.65, y + r * dy);
+            c.lineTo(x - r * 0.24, y + r * (dy + 0.03));
+            c.moveTo(x + r * 0.24, y + r * (dy + 0.03));
+            c.lineTo(x + r * 0.65, y + r * dy);
+          }
+          c.stroke();
+
+          // Vòng cổ đỏ & Chuông vàng
+          c.fillStyle = '#e63946';
+          c.fillRect(x - r, y + r * 0.68, r * 2, r * 0.16);
+          c.fillStyle = '#ffd60a';
+          c.beginPath();
+          c.arc(x, y + r * 0.8, r * 0.16, 0, Math.PI * 2);
+          c.fill();
+          c.restore();
+        }
+      };
+
+      // --- Character 8: FRIEREN ---
+      const FRIEREN_CONFIG = {
+        id: 'frieren',
+        name: 'FRIEREN',
+        avatarUrl: '',
+        color: '#c8b6ff',
+        secondaryColor: '#72efdd',
+        maxHp: 100,
+        attack: 2.0,
+        defense: 0.52,
+        speed: 386,
+        critChance: 0.19,
+        critMult: 1.55,
+        radius: 62,
+        skill1Cd: 7.4,
+        skill2Cd: 7.2,
+        skills: {
+          // NỘI TẠI: Che Giấu Ma Lực (Mana Suppression) — Trên 50% HP tích nộ nhanh +25%; Dưới 50% HP tăng +22% dame
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'update') {
+              self.energyGainMult = self.currentHp > self.maxHp * 0.5 ? 1.25 : 1.0;
+              self.custom.manaUnleashed = self.currentHp <= self.maxHp * 0.5;
+            } else if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (self.magicShield && !dmgInfo.isDot) {
+                self.magicShield = false;
+                dmgInfo.amount *= 0.35; // Kết giới phòng ngự chặn 65% sát thương
+                SoundFX.block();
+                arena.spawnRing(self.x, self.y, self.radius + 10, self.radius + 75, '#ffd166', 0.38);
+                arena.showFighterSkill(self, '[DEFENSIVE MAGIC!]', '#ffd166');
+              }
+            }
+          },
+
+          // CHIÊU 1: Ma Pháp Phòng Ngự Lục Giác (Defensive Magic) — Bật kết giới chặn 65% dame đòn kế tiếp
+          skill1(self, target, arena) {
+            SoundFX.block();
+            self.magicShield = true;
+            arena.spawnRing(self.x, self.y, self.radius + 6, self.radius + 55, '#ffd166', 0.35);
+            arena.showFighterSkill(self, '[DEFENSIVE BARRIER!]', '#ffd166');
+          },
+
+          // CHIÊU 2: Ma Pháp Sát Nhân (Zoltraak) — Bắn tia ma pháp trắng-xanh xuyên giáp
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.slash();
+            const bonus = self.custom.manaUnleashed ? 1.22 : 1.0;
+            hitInfo.damage = (hitInfo.damage * 1.45 + 0.8) * bonus;
+            hitInfo.isCrit = true;
+            arena.addShake(15);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 12, 180, '#72efdd', 0.4);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#e0fbfc', 28, 480);
+            arena.showFighterSkill(self, '[ZOLTRAAK!]', '#72efdd');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Đỉnh Cao Ma Pháp (Height of Magic — Black Hole)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'HEIGHT OF MAGIC!', '#c8b6ff');
+            arena.showFighterSkill(self, '[HEIGHT OF MAGIC!]', '#c8b6ff');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                const dmg = self.custom.manaUnleashed ? 10.6 : 9.2;
+                arena.projectiles.push({
+                  type: 'frieren_blackhole',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 34),
+                  y: self.y + uy * (self.radius + 34),
+                  vx: ux * 920,
+                  vy: uy * 920,
+                  radius: 80,
+                  color: '#c8b6ff',
+                  damage: dmg,
+                  hit: false,
+                  life: 2.3
+                });
+                SoundFX.redBlast();
+                arena.addShake(26);
+                arena.triggerFlash('#c8b6ff', 0.34);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Tóc trắng bạc 2 bím + Tai Elf nhọn + Mắt xanh lục bảo
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.12, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#ffffff');
+          faceGrad.addColorStop(0.68, '#f1e4f3');
+          faceGrad.addColorStop(1, '#9d8df1');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Mái tóc trắng bạc chia ngôi + 2 lọn buộc bên
+          c.fillStyle = '#eef2ff';
+          c.beginPath();
+          c.moveTo(x - r, y + r * 0.35);
+          c.lineTo(x - r * 0.65, y - r * 0.25);
+          c.lineTo(x, y - r * 0.48);
+          c.lineTo(x + r * 0.65, y - r * 0.25);
+          c.lineTo(x + r, y + r * 0.35);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Đôi tai Elf nhọn 2 bên
+          c.fillStyle = '#ffe5d9';
+          c.beginPath();
+          c.moveTo(x - r * 0.65, y - r * 0.05);
+          c.lineTo(x - r * 0.96, y - r * 0.14);
+          c.lineTo(x - r * 0.65, y + r * 0.14);
+          c.closePath();
+          c.fill();
+          c.beginPath();
+          c.moveTo(x + r * 0.65, y - r * 0.05);
+          c.lineTo(x + r * 0.96, y - r * 0.14);
+          c.lineTo(x + r * 0.65, y + r * 0.14);
+          c.closePath();
+          c.fill();
+
+          // Đôi mắt xanh lục bảo đặc trưng của Frieren
+          c.shadowColor = '#72efdd';
+          c.shadowBlur = isAwakened ? 22 : 10;
+          c.fillStyle = isAwakened ? '#a0ffef' : '#2ec4b6';
+          c.beginPath();
+          c.ellipse(x - r * 0.27, y - r * 0.02, r * 0.14, r * 0.1, 0, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.27, y - r * 0.02, r * 0.14, r * 0.1, 0, 0, Math.PI * 2);
+          c.fill();
+
+          // Nụ cười điềm tĩnh nhẹ nhàng
+          c.shadowBlur = 0;
+          c.strokeStyle = '#4a4e69';
+          c.lineWidth = Math.max(2.2, r * 0.05);
+          c.beginPath();
+          c.arc(x, y + r * 0.3, r * 0.18, 0.15 * Math.PI, 0.85 * Math.PI);
+          c.stroke();
+          c.restore();
+        },
+
+        drawCustomEffects(c, self, time) {
+          if (self.magicShield) {
+            c.save();
+            c.strokeStyle = '#ffd166';
+            c.lineWidth = 4;
+            c.shadowColor = '#ffd166';
+            c.shadowBlur = 18;
+            c.setLineDash([14, 8]);
+            c.beginPath();
+            c.arc(self.x, self.y, self.radius + 14, -time * 1.8, -time * 1.8 + Math.PI * 2);
+            c.stroke();
+            c.restore();
+          }
+        }
+      };
+
+      // --- Character 9: THOR ---
+      const THOR_CONFIG = {
+        id: 'thor',
+        name: 'THOR',
+        avatarUrl: '',
+        color: '#38bdf8',
+        secondaryColor: '#facc15',
+        maxHp: 100,
+        attack: 2.05,
+        defense: 0.54,
+        speed: 392,
+        critChance: 0.19,
+        critMult: 1.55,
+        radius: 62,
+        skill1Cd: 7.4,
+        skill2Cd: 7.4,
+        skills: {
+          // NỘI TẠI: Thần Sấm (God of Thunder) — 35% cơ hội giáng thêm tia sét phụ khi đánh trúng
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'onHitSuccess' && arena.rng() < 0.35) {
+              arena.applyDamage(self, target, 1.1, {
+                isDot: true,
+                color: '#7dd3fc',
+                label: '-1.1 SHOCK',
+                size: 24
+              });
+              arena.spawnSlash(target.x, target.y, '#38bdf8', 110);
+              arena.spawnParticles(target.x, target.y, '#7dd3fc', 12, 340);
+            }
+          },
+
+          // CHIÊU 1: Ném Búa Mjolnir (Mjolnir Throw) — Búa bay xuyên đối thủ khi nảy tường
+          skill1(self, target, arena) {
+            SoundFX.slash();
+            const ang = Math.atan2(target.y - self.y, target.x - self.x);
+            arena.projectiles.push({
+              type: 'mjolnir',
+              owner: self,
+              target,
+              x: self.x + Math.cos(ang) * (self.radius + 16),
+              y: self.y + Math.sin(ang) * (self.radius + 16),
+              vx: Math.cos(ang) * 1020,
+              vy: Math.sin(ang) * 1020,
+              angle: ang,
+              radius: 32,
+              color: '#7dd3fc',
+              damage: 3.1,
+              hit: false,
+              life: 1.5
+            });
+            arena.showFighterSkill(self, '[MJOLNIR THROW!]', '#38bdf8');
+          },
+
+          // CHIÊU 2: Sấm Sét Trời Giáng (Lightning Strike) — Chí mạng cận chiến + tê liệt nhẹ 1s
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            hitInfo.damage *= 1.52;
+            hitInfo.isCrit = true;
+            target.domainSlowTimer = Math.max(target.domainSlowTimer, 1.0);
+            arena.addShake(16);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 15, 190, '#38bdf8', 0.4);
+            arena.spawnSlash(target.x, target.y, '#ffffff', 135);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#7dd3fc', 30, 500);
+            arena.showFighterSkill(self, '[LIGHTNING STRIKE!]', '#7dd3fc');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Rìu Thần Stormbreaker (Bifrost Stormbreaker)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'STORMBREAKER!', '#38bdf8');
+            arena.showFighterSkill(self, '[BIFROST STORMBREAKER!]', '#38bdf8');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'stormbreaker_ult',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 34),
+                  y: self.y + uy * (self.radius + 34),
+                  vx: ux * 1040,
+                  vy: uy * 1040,
+                  radius: 78,
+                  color: '#38bdf8',
+                  damage: 9.6,
+                  hit: false,
+                  life: 2.2
+                });
+                SoundFX.redBlast();
+                arena.addShake(26);
+                arena.triggerFlash('#7dd3fc', 0.34);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Mũ giáp có cánh bạc + Tóc vàng + Mắt phát sét xanh dương
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.14, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#fff2e2');
+          faceGrad.addColorStop(0.68, '#e3be9e');
+          faceGrad.addColorStop(1, '#5b7c99');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tóc vàng hai bên
+          c.fillStyle = '#facc15';
+          c.fillRect(x - r, y - r * 0.4, r * 0.32, r * 0.85);
+          c.fillRect(x + r * 0.68, y - r * 0.4, r * 0.32, r * 0.85);
+
+          // Mũ giáp bạc Asgard phía trên
+          c.fillStyle = '#94a3b8';
+          c.beginPath();
+          c.arc(x, y - r * 0.28, r * 0.92, Math.PI, 0);
+          c.closePath();
+          c.fill();
+
+          // Đôi cánh trắng bạc 2 bên mũ
+          c.fillStyle = '#f8fafc';
+          c.beginPath();
+          c.moveTo(x - r * 0.55, y - r * 0.34);
+          c.lineTo(x - r * 0.95, y - r * 0.72);
+          c.lineTo(x - r * 0.42, y - r * 0.52);
+          c.closePath();
+          c.fill();
+          c.beginPath();
+          c.moveTo(x + r * 0.55, y - r * 0.34);
+          c.lineTo(x + r * 0.95, y - r * 0.72);
+          c.lineTo(x + r * 0.42, y - r * 0.52);
+          c.closePath();
+          c.fill();
+
+          // Đôi mắt phát sét xanh neon
+          c.shadowColor = '#38bdf8';
+          c.shadowBlur = isAwakened ? 24 : 14;
+          c.fillStyle = '#e0f2fe';
+          c.beginPath();
+          c.ellipse(x - r * 0.27, y - r * 0.02, r * 0.15, r * 0.09, 0, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.27, y - r * 0.02, r * 0.15, r * 0.09, 0, 0, Math.PI * 2);
+          c.fill();
+
+          // Râu quai nón vàng gọn
+          c.shadowBlur = 0;
+          c.fillStyle = '#ca8a04';
+          c.beginPath();
+          c.arc(x, y + r * 0.44, r * 0.36, 0, Math.PI);
+          c.fill();
+          c.restore();
+        }
+      };
+
+      // --- Character 10: CAPTAIN AMERICA ---
+      const CAPTAIN_AMERICA_CONFIG = {
+        id: 'captain_america',
+        name: 'CAPTAIN AMERICA',
+        avatarUrl: '',
+        color: '#2563eb',
+        secondaryColor: '#ef4444',
+        maxHp: 100,
+        attack: 1.92,
+        defense: 0.62,
+        speed: 396,
+        critChance: 0.17,
+        critMult: 1.5,
+        radius: 62,
+        skill1Cd: 7.0,
+        skill2Cd: 7.2,
+        skills: {
+          // NỘI TẠI: Khiên Vibranium — Giảm 20% sát thương trực tiếp & phản 35% sát thương cận chiến
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (!dmgInfo.isDot && dmgInfo.amount > 0) {
+                dmgInfo.amount *= 0.8;
+                if (target && !dmgInfo.isReflect && Math.hypot(self.x - target.x, self.y - target.y) < 170) {
+                  const reflectDmg = Math.max(0.3, dmgInfo.amount * 0.35);
+                  arena.applyDamage(self, target, reflectDmg, {
+                    isDot: true,
+                    isReflect: true,
+                    color: '#60a5fa',
+                    label: `-${fmtDmg(reflectDmg)} REFLECT`,
+                    size: 22
+                  });
+                }
+              }
+            }
+          },
+
+          // CHIÊU 1: Ném Khiên Vibranium (Shield Throw) — Khiên xoay bay cực nhanh khi nảy tường
+          skill1(self, target, arena) {
+            SoundFX.block();
+            const ang = Math.atan2(target.y - self.y, target.x - self.x);
+            arena.projectiles.push({
+              type: 'vibranium_shield',
+              owner: self,
+              target,
+              x: self.x + Math.cos(ang) * (self.radius + 16),
+              y: self.y + Math.sin(ang) * (self.radius + 16),
+              vx: Math.cos(ang) * 1060,
+              vy: Math.sin(ang) * 1060,
+              angle: ang,
+              radius: 32,
+              color: '#ef4444',
+              damage: 3.0,
+              hit: false,
+              life: 1.5
+            });
+            arena.showFighterSkill(self, '[SHIELD THROW!]', '#60a5fa');
+          },
+
+          // CHIÊU 2: Húc Khiên (Shield Bash) — Húc chí mạng + đẩy lùi cực mạnh
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            hitInfo.damage *= 1.48;
+            hitInfo.knockbackBoost = 2.45;
+            hitInfo.isCrit = true;
+            arena.addShake(16);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 15, 195, '#3b82f6', 0.42);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#ef4444', 28, 520);
+            arena.showFighterSkill(self, '[SHIELD BASH!]', '#3b82f6');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Avengers Assemble — Siêu sóng xung kích Khiên + Sét
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'AVENGERS ASSEMBLE!', '#3b82f6');
+            arena.showFighterSkill(self, '[AVENGERS ASSEMBLE!]', '#60a5fa');
+            self.castFreeze = 0.4;
+            self.pendingUlt = {
+              delay: 0.4,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'cap_assemble_ult',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 34),
+                  y: self.y + uy * (self.radius + 34),
+                  vx: ux * 1020,
+                  vy: uy * 1020,
+                  radius: 76,
+                  color: '#3b82f6',
+                  damage: 9.4,
+                  hit: false,
+                  life: 2.2
+                });
+                SoundFX.redBlast();
+                arena.addShake(25);
+                arena.triggerFlash('#60a5fa', 0.32);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Mũ giáp xanh chữ A trắng + Mắt xanh + Huy hiệu Khiên Vibranium
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          // Nền xanh dương mũ giáp Captain America
+          c.fillStyle = '#1d4ed8';
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Phần cằm lộ da phía dưới mặt nạ
+          c.fillStyle = '#f3cbb0';
+          c.fillRect(x - r * 0.56, y + r * 0.14, r * 1.12, r * 0.86);
+
+          // Chữ A trắng nổi bật trên trán
+          c.fillStyle = '#ffffff';
+          c.font = `900 ${Math.round(r * 0.52)}px 'Segoe UI', Impact, sans-serif`;
+          c.textAlign = 'center';
+          c.textBaseline = 'middle';
+          c.fillText('A', x, y - r * 0.48);
+
+          // Đôi mắt quyết đoán
+          c.fillStyle = isAwakened ? '#93c5fd' : '#ffffff';
+          c.beginPath();
+          c.ellipse(x - r * 0.28, y - r * 0.04, r * 0.15, r * 0.08, 0, 0, Math.PI * 2);
+          c.ellipse(x + r * 0.28, y - r * 0.04, r * 0.15, r * 0.08, 0, 0, Math.PI * 2);
+          c.fill();
+
+          // Dải viền đỏ-trắng đặc trưng phía dưới
+          c.fillStyle = '#ef4444';
+          c.fillRect(x - r, y + r * 0.62, r * 2, r * 0.16);
+          c.fillStyle = '#ffffff';
+          c.fillRect(x - r, y + r * 0.78, r * 2, r * 0.16);
+          c.restore();
+        }
+      };
+
+      // --- Character 11: IRON MAN ---
+      const IRONMAN_CONFIG = {
+        id: 'ironman',
+        name: 'IRON MAN',
+        avatarUrl: '',
+        color: '#dc2626',
+        secondaryColor: '#facc15',
+        maxHp: 100,
+        attack: 2.02,
+        defense: 0.55,
+        speed: 404,
+        critChance: 0.2,
+        critMult: 1.55,
+        radius: 62,
+        skill1Cd: 7.0,
+        skill2Cd: 7.4,
+        skills: {
+          // NỘI TẠI: Lò Phản Ứng Hồ Quang (Arc Reactor) — Tích năng lượng nhanh hơn +30%
+          passive(self, target, arena, eventType) {
+            if (eventType === 'init' || eventType === 'update') {
+              self.energyGainMult = 1.3;
+            }
+          },
+
+          // CHIÊU 1: Tia Phản Lực (Repulsor Blast) — Bắn 2 tia năng lượng xanh trắng siêu nhanh khi nảy tường
+          skill1(self, target, arena) {
+            SoundFX.slash();
+            const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
+            for (const off of [-0.14, 0.14]) {
+              const a = baseAng + off;
+              arena.projectiles.push({
+                type: 'repulsor_blast',
+                owner: self,
+                target,
+                x: self.x + Math.cos(a) * (self.radius + 16),
+                y: self.y + Math.sin(a) * (self.radius + 16),
+                vx: Math.cos(a) * 1140,
+                vy: Math.sin(a) * 1140,
+                angle: a,
+                radius: 26,
+                color: '#38bdf8',
+                damage: 1.9,
+                hit: false,
+                life: 1.3
+              });
+            }
+            arena.showFighterSkill(self, '[REPULSOR BLAST!]', '#38bdf8');
+          },
+
+          // CHIÊU 2: Kiếm Nano (Nanotech Blade) — Chém cận chiến chí mạng xuyên giáp
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.slash();
+            hitInfo.damage = hitInfo.damage * 1.48 + 0.65;
+            hitInfo.isCrit = true;
+            arena.addShake(15);
+            arena.spawnSlash(target.x, target.y, '#facc15', 120);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#facc15', 26, 480);
+            arena.showFighterSkill(self, '[NANOTECH BLADE!]', '#facc15');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Đại Pháo Unibeam (Unibeam Overdrive)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'UNIBEAM OVERDRIVE!', '#38bdf8');
+            arena.showFighterSkill(self, '[UNIBEAM OVERDRIVE!]', '#7dd3fc');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'unibeam_ult',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 34),
+                  y: self.y + uy * (self.radius + 34),
+                  vx: ux * 1120,
+                  vy: uy * 1120,
+                  radius: 78,
+                  color: '#7dd3fc',
+                  damage: 9.5,
+                  hit: false,
+                  life: 2.2
+                });
+                SoundFX.redBlast();
+                arena.addShake(26);
+                arena.triggerFlash('#7dd3fc', 0.34);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Mũ giáp Iron Man đỏ + Mặt nạ vàng kim + 2 khe mắt xanh sáng rực
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          // Nền giáp đỏ thẫm
+          c.fillStyle = '#b91c1c';
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Tấm mặt nạ vàng kim đặc trưng của Iron Man
+          c.fillStyle = '#facc15';
+          c.beginPath();
+          c.moveTo(x - r * 0.52, y - r * 0.65);
+          c.lineTo(x + r * 0.52, y - r * 0.65);
+          c.lineTo(x + r * 0.62, y + r * 0.15);
+          c.lineTo(x + r * 0.36, y + r * 0.64);
+          c.lineTo(x - r * 0.36, y + r * 0.64);
+          c.lineTo(x - r * 0.62, y + r * 0.15);
+          c.closePath();
+          c.fill();
+
+          // Khe trán đỏ chia mặt nạ
+          c.fillStyle = '#b91c1c';
+          c.fillRect(x - r * 0.22, y - r * 0.72, r * 0.44, r * 0.28);
+
+          // 2 khe mắt chữ nhật phát sáng xanh trắng
+          c.shadowColor = '#38bdf8';
+          c.shadowBlur = isAwakened ? 24 : 14;
+          c.fillStyle = '#e0f2fe';
+          c.fillRect(x - r * 0.44, y - r * 0.12, r * 0.32, r * 0.12);
+          c.fillRect(x + r * 0.12, y - r * 0.12, r * 0.32, r * 0.12);
+
+          // Đường viền miệng giáp
+          c.shadowBlur = 0;
+          c.strokeStyle = '#7f1d1d';
+          c.lineWidth = Math.max(2.5, r * 0.06);
+          c.beginPath();
+          c.moveTo(x - r * 0.32, y + r * 0.34);
+          c.lineTo(x + r * 0.32, y + r * 0.34);
+          c.stroke();
+          c.restore();
+        }
+      };
+
+      // --- Character 12: HULK ---
+      const HULK_CONFIG = {
+        id: 'hulk',
+        name: 'HULK',
+        avatarUrl: '',
+        color: '#22c55e',
+        secondaryColor: '#a855f7',
+        maxHp: 100,
+        attack: 2.12,
+        defense: 0.58,
+        speed: 382,
+        critChance: 0.18,
+        critMult: 1.6,
+        radius: 65, // To hơn một chút chuẩn vóc dáng Hulk
+        skill1Cd: 7.6,
+        skill2Cd: 7.4,
+        skills: {
+          // NỘI TẠI: Cơn Thịnh Nộ Vô Hạn (Unlimited Rage) — Máu càng thấp đánh càng mạnh (tối đa +45%)
+          passive(self, target, arena, eventType, payload) {
+            if (eventType === 'onTakeDamage') {
+              const dmgInfo = payload;
+              if (!dmgInfo.blocked && dmgInfo.amount > 0) {
+                self.addEnergy(3); // Bị đánh càng tăng nộ nhanh
+              }
+            }
+          },
+
+          // CHIÊU 1: Vỗ Tay Sấm Sét (Thunderclap) — Bắn sóng xung kích Gamma đẩy lùi mạnh khi nảy tường
+          skill1(self, target, arena) {
+            SoundFX.redBlast();
+            const ang = Math.atan2(target.y - self.y, target.x - self.x);
+            arena.projectiles.push({
+              type: 'thunderclap',
+              owner: self,
+              target,
+              x: self.x + Math.cos(ang) * (self.radius + 18),
+              y: self.y + Math.sin(ang) * (self.radius + 18),
+              vx: Math.cos(ang) * 940,
+              vy: Math.sin(ang) * 940,
+              angle: ang,
+              radius: 40,
+              color: '#4ade80',
+              damage: 3.1,
+              hit: false,
+              life: 1.5
+            });
+            arena.showFighterSkill(self, '[THUNDERCLAP!]', '#4ade80');
+          },
+
+          // CHIÊU 2: HULK SMASH — Cú đập chí mạng tăng theo lượng máu đã mất + hất văng cực mạnh
+          skill2(self, target, arena, hitInfo) {
+            SoundFX.redBlast();
+            const missingRatio = Math.max(0, (self.maxHp - self.currentHp) / self.maxHp);
+            const rageBonus = 1 + missingRatio * 0.45;
+            hitInfo.damage *= 1.5 * rageBonus;
+            hitInfo.knockbackBoost = 2.5;
+            hitInfo.isCrit = true;
+            arena.addShake(20);
+            arena.spawnRing(hitInfo.cx, hitInfo.cy, 18, 220, '#22c55e', 0.45);
+            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#4ade80', 36, 580);
+            arena.showFighterSkill(self, '[HULK SMASH!]', '#22c55e');
+          },
+
+          // CHIÊU 3 (ULTIMATE): Kẻ Phá Hủy Thế Giới (World Breaker Gamma Quake)
+          ultimate(self, target, arena) {
+            SoundFX.ultimate();
+            arena.triggerUltimateCinematic(self, 'WORLD BREAKER!', '#22c55e');
+            arena.showFighterSkill(self, '[WORLD BREAKER!]', '#4ade80');
+            self.castFreeze = 0.45;
+            self.pendingUlt = {
+              delay: 0.45,
+              execute: () => {
+                const dx = target.x - self.x;
+                const dy = target.y - self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                const ux = dx / d;
+                const uy = dy / d;
+
+                arena.projectiles.push({
+                  type: 'gamma_quake',
+                  owner: self,
+                  target,
+                  x: self.x + ux * (self.radius + 36),
+                  y: self.y + uy * (self.radius + 36),
+                  vx: ux * 920,
+                  vy: uy * 920,
+                  radius: 86,
+                  color: '#22c55e',
+                  damage: 10.2,
+                  hit: false,
+                  life: 2.3
+                });
+                target.domainSlowTimer = Math.max(target.domainSlowTimer, 1.5);
+                SoundFX.redBlast();
+                arena.addShake(30);
+                arena.triggerFlash('#22c55e', 0.36);
+              }
+            };
+          }
+        },
+
+        // Fallback Canvas Art: Đầu xanh lá Hulk + Tóc đen xù góc cạnh + Mắt giận dữ + Hàm răng nghiến
+        drawFallbackAvatar(c, x, y, r, isAwakened) {
+          c.save();
+          const faceGrad = c.createRadialGradient(x, y + r * 0.1, r * 0.1, x, y, r);
+          faceGrad.addColorStop(0, '#86efac');
+          faceGrad.addColorStop(0.6, '#22c55e');
+          faceGrad.addColorStop(1, '#14532d');
+          c.fillStyle = faceGrad;
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.fill();
+
+          c.beginPath();
+          c.arc(x, y, r, 0, Math.PI * 2);
+          c.clip();
+
+          // Mái tóc đen xù dày
+          c.fillStyle = '#0f172a';
+          c.beginPath();
+          c.moveTo(x - r, y - r * 0.25);
+          c.lineTo(x - r * 0.5, y - r * 0.48);
+          c.lineTo(x - r * 0.15, y - r * 0.34);
+          c.lineTo(x + r * 0.2, y - r * 0.5);
+          c.lineTo(x + r * 0.6, y - r * 0.34);
+          c.lineTo(x + r, y - r * 0.25);
+          c.lineTo(x + r, y - r * 1.2);
+          c.lineTo(x - r, y - r * 1.2);
+          c.closePath();
+          c.fill();
+
+          // Đôi lông mày nhíu giận dữ + Mắt phát sáng xanh/vàng
+          c.fillStyle = isAwakened ? '#bef264' : '#ffffff';
+          c.shadowColor = '#22c55e';
+          c.shadowBlur = isAwakened ? 20 : 8;
+          c.beginPath();
+          c.moveTo(x - r * 0.46, y - r * 0.14);
+          c.lineTo(x - r * 0.14, y - r * 0.02);
+          c.lineTo(x - r * 0.42, y + r * 0.04);
+          c.closePath();
+          c.fill();
+
+          c.beginPath();
+          c.moveTo(x + r * 0.46, y - r * 0.14);
+          c.lineTo(x + r * 0.14, y - r * 0.02);
+          c.lineTo(x + r * 0.42, y + r * 0.04);
+          c.closePath();
+          c.fill();
+
+          // Hàm răng trắng nghiến chặt đầy uy lực
+          c.shadowBlur = 0;
+          c.fillStyle = '#ffffff';
+          c.strokeStyle = '#052e16';
+          c.lineWidth = 3;
+          c.fillRect(x - r * 0.36, y + r * 0.22, r * 0.72, r * 0.24);
+          c.strokeRect(x - r * 0.36, y + r * 0.22, r * 0.72, r * 0.24);
+          c.restore();
+        }
+      };
+
+      const CHARACTER_REGISTRY = {
+        gojo: new Character(GOJO_CONFIG),
+        sukuna: new Character(SUKUNA_CONFIG),
+        naruto: new Character(NARUTO_CONFIG),
+        luffy: new Character(LUFFY_CONFIG),
+        eren: new Character(EREN_CONFIG),
+        levi: new Character(LEVI_CONFIG),
+        doraemon: new Character(DORAEMON_CONFIG),
+        frieren: new Character(FRIEREN_CONFIG),
+        thor: new Character(THOR_CONFIG),
+        captain_america: new Character(CAPTAIN_AMERICA_CONFIG),
+        ironman: new Character(IRONMAN_CONFIG),
+        hulk: new Character(HULK_CONFIG)
+      };
+
+      // =========================================================================
+      // 5. FIGHTER RUNTIME INSTANCE
+      // =========================================================================
+      class FighterEntity {
+        constructor(character, side, x, y, rng) {
+          this.char = character;
+          this.side = side;
+          this.x = x;
+          this.y = y;
+
+          const baseAngle = side === 0 ? 0 : Math.PI;
+          const angle = baseAngle + (rng() - 0.5) * 0.9;
+          this.vx = Math.cos(angle) * character.speed;
+          this.vy = Math.sin(angle) * character.speed;
+
+          this.radius = character.radius;
+          this.maxHp = character.maxHp;
+          this.currentHp = character.maxHp;
+          this.displayHp = character.maxHp;
+          this.trailHp = character.maxHp;
+
+          this.energy = 0;         // Thanh năng lượng 0 -> 100
+          this.displayEnergy = 0;
+          this.skill1Timer = character.skill1Cd * 0.55; // Khởi đầu hồi sẵn 55% để sớm có hành động
+          this.skill2Timer = character.skill2Cd * 0.6;
+          this.ultLowHpTriggered = false;
+
+          this.isAwakened = false;
+          this.hitFlash = 0;       // White flash 0.1s khi dính đòn
+          this.ultScale = 1.0;
+          this.castFreeze = 0;     // Dừng bóng khi tụ Hollow Purple
+          this.pendingUlt = null;
+
+          this.bleedStacks = [];   // [{ dps, remaining, tickAccum, source }] (tối đa 3 stack)
+          this.redSlamArmed = false;
+          this.redSlamSource = null;
+          this.domainSlowTimer = 0;
+          this.speedBoostTimer = 0;
+          this.damageDebuffTimer = 0;
+          this.magicShield = false;
+          this.energyGainMult = 1.0;
+          this.activeSkillCallout = null; // Hiển thị tên skill ngay dưới vạch máu (không che sàn đấu)
+
+          this.totalDamageDealt = 0;
+          this.hitsLanded = 0;
+          this.trail = [];
+          this.custom = {};
+
+          if (character.skills.passive) {
+            character.skills.passive(this, null, null, 'init');
+          }
+        }
+
+        addEnergy(amount) {
+          this.energy = Math.min(100, this.energy + amount * (this.energyGainMult || 1.0));
+        }
+
+        addBleedStack(source, dps, duration, maxStacks = 3) {
+          if (this.bleedStacks.length >= maxStacks) {
+            // Làm mới stack sắp hết hạn nhất
+            this.bleedStacks.sort((a, b) => a.remaining - b.remaining);
+            this.bleedStacks[0].remaining = duration;
+            this.bleedStacks[0].dps = dps;
+            this.bleedStacks[0].source = source;
+          } else {
+            this.bleedStacks.push({ dps, remaining: duration, tickAccum: 0, source });
+          }
+        }
+      }
+
+      // =========================================================================
+      // 6. MAIN BATTLE ARENA ENGINE (2D Physics + Skills + Visual FX)
+      // =========================================================================
+      class BattleArena {
+        constructor() {
+          this.p1Id = 'gojo';
+          this.p2Id = 'sukuna';
+          this.seed = '7772026';
+          this.userSpeed = 1.0;
+          this.running = false;
+          this.reset();
+        }
+
+        reset() {
+          this.rng = createRNG(this.seed);
+          this.elapsed = 0;
+          this.time = 0;
+          this.arenaRadius = ARENA_INITIAL_RADIUS;
+          this.isShrinking = false;
+          this.isOverdrive = false;
+          this.collisionCooldown = 0;
+
+          // Active skill entities & FX pools
+          this.particles = [];
+          this.floatingTexts = [];
+          this.skillPopups = [];
+          this.rings = [];
+          this.slashes = [];
+          this.projectiles = [];
+          this.blueVortices = [];
+          this.domainEffect = null;
+
+          this.shakeIntensity = 0;
+          this.flash = { color: '#ffffff', alpha: 0 };
+          this.ultCinematic = { active: false, timer: 0, duration: 0.42, text: '', color: '#ffffff' };
+          this.koState = null;
+
+          this.fighters = [
+            new FighterEntity(CHARACTER_REGISTRY[this.p1Id], 0, ARENA_CX - 210, ARENA_CY, this.rng),
+            new FighterEntity(CHARACTER_REGISTRY[this.p2Id], 1, ARENA_CX + 210, ARENA_CY, this.rng)
+          ];
+
+          this.updateTimerDOM();
+        }
+
+        // --- Juice & FX Spawners ---
+        addShake(amount) {
+          this.shakeIntensity = Math.min(36, Math.max(this.shakeIntensity, amount));
+        }
+
+        triggerFlash(color = '#ffffff', alpha = 0.65) {
+          this.flash.color = color;
+          this.flash.alpha = Math.max(this.flash.alpha, alpha);
+        }
+
+        triggerUltimateCinematic(caster, text, color) {
+          caster.ultScale = 1.24;
+          this.ultCinematic = { active: true, timer: 0, duration: 0.45, text, color };
+        }
+
+        spawnParticles(x, y, color, count = 16, maxSpeed = 400) {
+          for (let i = 0; i < count; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const spd = 70 + Math.random() * maxSpeed;
+            this.particles.push({
+              x, y,
+              vx: Math.cos(ang) * spd,
+              vy: Math.sin(ang) * spd,
+              size: 3 + Math.random() * 6,
+              color,
+              life: 0.35 + Math.random() * 0.45,
+              maxLife: 0.8
+            });
+          }
+        }
+
+        spawnRing(x, y, startR, endR, color, duration = 0.4) {
+          this.rings.push({ x, y, startR, endR, color, age: 0, duration });
+        }
+
+        spawnSlash(x, y, color = '#ff003c', length = 110) {
+          this.slashes.push({
+            x, y,
+            angle: (Math.random() - 0.5) * Math.PI,
+            color,
+            length,
+            age: 0,
+            duration: 0.24
+          });
+        }
+
+        spawnFloatingText(x, y, text, color = '#ffffff', size = 32) {
+          this.floatingTexts.push({
+            x: x + (Math.random() - 0.5) * 28,
+            y,
+            vy: -130 - Math.random() * 45,
+            text,
+            color,
+            size,
+            age: 0,
+            duration: 0.92
+          });
+        }
+
+        // Hiển thị tên skill ngay dưới vạch máu của nhân vật (không che tầm nhìn sàn đấu)
+        showFighterSkill(fighter, text, color = '#ffffff') {
+          fighter.activeSkillCallout = { text, color, age: 0, duration: 1.8 };
+        }
+
+        // Thông báo toàn sàn (chỉ hiển thị phía trên vòng tròn đấu trường, không che bóng)
+        spawnSkillPopup(x, y, text, color = '#ffffff', size = 34) {
+          this.skillPopups.push({
+            x: Math.max(170, Math.min(CANVAS_W - 170, x)),
+            y: Math.min(435, Math.max(365, y)),
+            text,
+            color,
+            size,
+            age: 0,
+            duration: 1.15
+          });
+        }
+
+        // --- Main Simulation Update ---
+        update(rawDt) {
+          let timeScale = this.userSpeed;
+          if (this.koState) {
+            this.koState.realTimer += rawDt;
+            timeScale = this.koState.realTimer < this.koState.duration ? 0.2 : 0.0;
+          }
+
+          const dt = rawDt * timeScale;
+          this.time += rawDt;
+
+          this.shakeIntensity = Math.max(0, this.shakeIntensity - rawDt * 52);
+          this.flash.alpha = Math.max(0, this.flash.alpha - rawDt * 1.9);
+
+          if (this.ultCinematic.active) {
+            this.ultCinematic.timer += rawDt;
+            if (this.ultCinematic.timer >= this.ultCinematic.duration) {
+              this.ultCinematic.active = false;
+            }
+          }
+
+          for (const f of this.fighters) {
+            f.displayHp += (f.currentHp - f.displayHp) * Math.min(1, rawDt * 14);
+            f.trailHp += (f.currentHp - f.trailHp) * Math.min(1, rawDt * 3.8);
+            f.displayEnergy += (f.energy - f.displayEnergy) * Math.min(1, rawDt * 12);
+            f.hitFlash = Math.max(0, f.hitFlash - rawDt * 10); // ~0.1s white flash
+            f.ultScale += (1.0 - f.ultScale) * Math.min(1, rawDt * 5);
+            if (f.activeSkillCallout) {
+              f.activeSkillCallout.age += rawDt;
+              if (f.activeSkillCallout.age >= f.activeSkillCallout.duration) {
+                f.activeSkillCallout = null;
+              }
+            }
+          }
+
+          if (!this.running || dt <= 0) {
+            this.updateVisualPools(rawDt * (this.koState ? 0.35 : 0));
+            return;
+          }
+
+          if (!this.koState) {
+            this.elapsed += dt;
+          }
+
+          // 1. Pacing: Thu bo sau 15s & Overdrive 2x sát thương sau 30s
+          if (!this.isShrinking && this.elapsed >= SHRINK_START_TIME) {
+            this.isShrinking = true;
+            this.spawnSkillPopup(ARENA_CX, 455, '[ZONE SHRINKING!]', '#ff8800', 42);
+          }
+          if (this.isShrinking && this.arenaRadius > ARENA_MIN_RADIUS) {
+            this.arenaRadius = Math.max(ARENA_MIN_RADIUS, this.arenaRadius - ARENA_SHRINK_RATE * dt);
+          }
+
+          if (!this.isOverdrive && this.elapsed >= OVERDRIVE_START_TIME) {
+            this.isOverdrive = true;
+            this.addShake(18);
+            this.triggerFlash('#ff003c', 0.25);
+            this.spawnSkillPopup(ARENA_CX, 495, '[OVERDRIVE — 2X DAMAGE!]', '#ffd60a', 46);
+          }
+
+          // 2. Cập nhật nhân vật, Awakening (<30% HP), Passive, Ultimate & Bleed
+          if (!this.koState) {
+            for (let i = 0; i < 2; i++) {
+              const f = this.fighters[i];
+              const enemy = this.fighters[1 - i];
+
+              f.skill1Timer += dt;
+              f.skill2Timer += dt;
+              f.domainSlowTimer = Math.max(0, f.domainSlowTimer - dt);
+              f.speedBoostTimer = Math.max(0, f.speedBoostTimer - dt);
+              f.damageDebuffTimer = Math.max(0, f.damageDebuffTimer - dt);
+
+              // Pending Ultimate cast (VD: Gojo tụ năng lượng 0.5s trước khi bắn Hollow Purple)
+              if (f.castFreeze > 0) {
+                f.castFreeze = Math.max(0, f.castFreeze - dt);
+                if (f.pendingUlt) {
+                  f.pendingUlt.delay -= dt;
+                  if (f.pendingUlt.delay <= 0) {
+                    const fn = f.pendingUlt.execute;
+                    f.pendingUlt = null;
+                    fn();
+                  }
+                }
+              }
+
+              // Phase Awakening (< 30% HP)
+              if (!f.isAwakened && f.currentHp > 0 && f.currentHp <= f.maxHp * 0.3) {
+                f.isAwakened = true;
+                this.addShake(20);
+                this.spawnRing(f.x, f.y, f.radius, f.radius + 170, f.char.color, 0.5);
+                this.spawnParticles(f.x, f.y, f.char.color, 40, 520);
+                this.showFighterSkill(f, '[AWAKENING!]', '#ffd60a');
+              }
+
+              // Kích hoạt Ultimate khi Energy = 100 HOẶC lần đầu máu dưới 30%
+              const triggerByEnergy = f.energy >= 100;
+              const triggerByLowHp = !f.ultLowHpTriggered && f.currentHp > 0 && f.currentHp <= f.maxHp * 0.3;
+              if ((triggerByEnergy || triggerByLowHp) && !f.pendingUlt && f.char.skills.ultimate) {
+                if (triggerByLowHp) f.ultLowHpTriggered = true;
+                f.energy = 0;
+                f.char.skills.ultimate(f, enemy, this);
+              }
+
+              // Passive Update
+              if (f.char.skills.passive) {
+                f.char.skills.passive(f, enemy, this, 'update', dt);
+              }
+
+              // Tia sét/lửa Awakening xung quanh quả bóng
+              if (f.isAwakened && Math.random() < 0.32) {
+                this.spawnParticles(
+                  f.x + (Math.random() - 0.5) * f.radius * 1.7,
+                  f.y + (Math.random() - 0.5) * f.radius * 1.7,
+                  f.char.color,
+                  1,
+                  150
+                );
+              }
+
+              // Xử lý Bleed Stacks (tối đa 3 stack)
+              for (let b = f.bleedStacks.length - 1; b >= 0; b--) {
+                const st = f.bleedStacks[b];
+                st.remaining -= dt;
+                st.tickAccum += dt;
+                if (st.tickAccum >= 0.5) {
+                  st.tickAccum -= 0.5;
+                  const dmg = st.dps * 0.5;
+                  this.applyDamage(st.source, f, dmg, {
+                    isDot: true,
+                    color: '#ff2a55',
+                    label: `-${Math.round(dmg)} BLEED`,
+                    size: 22
+                  });
+                  this.spawnParticles(f.x, f.y, '#ff003c', 4, 130);
+                }
+                if (st.remaining <= 0) f.bleedStacks.splice(b, 1);
+              }
+            }
+          }
+
+          // 3. Cập nhật Hố Đen Thương (Gojo Skill 1 - Blue)
+          this.updateBlueVortices(dt);
+
+          // 4. Cập nhật Lãnh Địa Phục Ma Ngự Thai Tử (Sukuna Ultimate)
+          this.updateDomainEffect(dt);
+
+          // 5. Cập nhật Đạn / Chưởng (Dismantle & Hollow Purple)
+          this.updateProjectiles(dt);
+
+          // 6. Vật lý 2D với Sub-stepping (Nhịp đấu mượt mà 50s - 60s)
+          this.collisionCooldown = Math.max(0, this.collisionCooldown - dt);
+          const subSteps = 3;
+          const subDt = dt / subSteps;
+          const pacingBoost = Math.min(1.55, 1 + this.elapsed * 0.009);
+
+          for (let s = 0; s < subSteps; s++) {
+            for (let i = 0; i < 2; i++) {
+              const f = this.fighters[i];
+              const enemy = this.fighters[1 - i];
+
+              if (f.castFreeze > 0) continue; // Đang tụ chiêu cuối
+
+              const curSpeed = Math.hypot(f.vx, f.vy) || 1;
+              const awakenMult = f.isAwakened ? 1.18 : 1.0;
+              const boostMult = f.speedBoostTimer > 0 ? 1.15 : 1.0;
+              const slowMult = f.domainSlowTimer > 0 ? 0.25 : 1.0;
+              const targetSpeed = f.char.speed * awakenMult * boostMult * pacingBoost * slowMult;
+              const blended = curSpeed + (targetSpeed - curSpeed) * Math.min(1, subDt * 6.5);
+              f.vx = (f.vx / curSpeed) * blended;
+              f.vy = (f.vy / curSpeed) * blended;
+
+              f.x += f.vx * subDt;
+              f.y += f.vy * subDt;
+
+              // Va chạm thành đấu trường hình tròn
+              const dx = f.x - ARENA_CX;
+              const dy = f.y - ARENA_CY;
+              const dist = Math.hypot(dx, dy);
+              const maxDist = this.arenaRadius - f.radius;
+
+              if (dist > maxDist && dist > 0.0001) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                f.x = ARENA_CX + nx * maxDist;
+                f.y = ARENA_CY + ny * maxDist;
+
+                const dot = f.vx * nx + f.vy * ny;
+                if (dot > 0) {
+                  f.vx -= 2 * dot * nx;
+                  f.vy -= 2 * dot * ny;
+
+                  const jitter = (this.rng() - 0.5) * 0.16;
+                  const cJ = Math.cos(jitter);
+                  const sJ = Math.sin(jitter);
+                  const nvx = f.vx * cJ - f.vy * sJ;
+                  const nvy = f.vx * sJ + f.vy * cJ;
+                  f.vx = nvx;
+                  f.vy = nvy;
+
+                  if (!this.koState) {
+                    f.addEnergy(3);
+                    SoundFX.wall(pacingBoost);
+                    if (f.char.skills.passive) {
+                      f.char.skills.passive(f, enemy, this, 'onWallBounce');
+                    }
+                    this.spawnParticles(
+                      ARENA_CX + nx * this.arenaRadius,
+                      ARENA_CY + ny * this.arenaRadius,
+                      f.char.color,
+                      8,
+                      240
+                    );
+
+                    // Nếu đang bị hất văng bởi Gojo Red -> Chịu thêm sát thương đập tường!
+                    if (f.redSlamArmed) {
+                      f.redSlamArmed = false;
+                      this.addShake(18);
+                      this.spawnParticles(f.x, f.y, '#ff1e56', 26, 460);
+                      this.applyDamage(f.redSlamSource, f, 4.2, {
+                        isCrit: true,
+                        color: '#ff3864',
+                        label: `-${fmtDmg(4.2 * (this.isOverdrive ? 2 : 1))} WALL SLAM!`,
+                        size: 34
+                      });
+                    }
+
+                    // Kích hoạt Skill 1 khi nảy tường và đã hồi chiêu
+                    if (f.skill1Timer >= f.char.skill1Cd && f.char.skills.skill1 && !this.koState) {
+                      f.skill1Timer = 0;
+                      f.char.skills.skill1(f, enemy, this);
+                    }
+                  }
+                }
+              }
+            }
+
+            this.resolveBallCollision();
+          }
+
+          // Vệt hạt năng lượng phía sau bóng (Particle trail)
+          for (const f of this.fighters) {
+            f.trail.push({ x: f.x, y: f.y });
+            if (f.trail.length > 14) f.trail.shift();
+            if (Math.hypot(f.vx, f.vy) > 520 && Math.random() < 0.45) {
+              this.spawnParticles(f.x, f.y, f.char.color, 1, 80);
+            }
+          }
+
+          this.updateVisualPools(dt);
+          this.updateTimerDOM();
+        }
+
+        updateBlueVortices(dt) {
+          for (let i = this.blueVortices.length - 1; i >= 0; i--) {
+            const v = this.blueVortices[i];
+            v.age += dt;
+            if (!this.koState) {
+              const t = v.target;
+              const dx = v.x - t.x;
+              const dy = v.y - t.y;
+              const d = Math.hypot(dx, dy) || 1;
+              // Lực hút cực mạnh kéo đối thủ về phía hố đen Blue
+              const pullForce = 1280;
+              t.vx += (dx / d) * pullForce * dt;
+              t.vy += (dy / d) * pullForce * dt;
+
+              v.tickAccum += dt;
+              if (v.tickAccum >= 0.35 && d < 280) {
+                v.tickAccum -= 0.35;
+                this.applyDamage(v.owner, t, 1.0, {
+                  isDot: true,
+                  color: '#38b6ff',
+                  label: '-1 BLUE',
+                  size: 24
+                });
+              }
+            }
+            if (v.age >= v.duration) this.blueVortices.splice(i, 1);
+          }
+        }
+
+        updateDomainEffect(dt) {
+          if (!this.domainEffect) return;
+          const dom = this.domainEffect;
+          dom.age += dt;
+          dom.slashAccum += dt;
+          dom.dmgAccum += dt;
+
+          // Triệu hồi hàng trăm vết chém đỏ rực phủ kín đấu trường
+          if (dom.slashAccum >= 0.03) {
+            dom.slashAccum = 0;
+            for (let k = 0; k < 3; k++) {
+              const ang = Math.random() * Math.PI * 2;
+              const rad = Math.random() * (this.arenaRadius - 20);
+              this.spawnSlash(
+                ARENA_CX + Math.cos(ang) * rad,
+                ARENA_CY + Math.sin(ang) * rad,
+                Math.random() < 0.75 ? '#ff003c' : '#ffffff',
+                90 + Math.random() * 140
+              );
+            }
+          }
+
+          if (!this.koState && dom.dmgAccum >= 0.3) {
+            dom.dmgAccum -= 0.3;
+            SoundFX.slash();
+            this.addShake(6);
+            this.applyDamage(dom.owner, dom.target, 1.0, {
+              isDot: true,
+              color: '#ff003c',
+              label: '-1 SHRINE',
+              size: 25
+            });
+            this.spawnParticles(dom.target.x, dom.target.y, '#ff003c', 9, 300);
+          }
+
+          if (dom.age >= dom.duration) {
+            this.domainEffect = null;
+          }
+        }
+
+        updateProjectiles(dt) {
+          const bigUltTypes = [
+            'hollow_purple', 'bijuu_dama', 'bajrang_gun',
+            'rumbling_wave', 'dora_beam', 'frieren_blackhole',
+            'stormbreaker_ult', 'cap_assemble_ult', 'unibeam_ult', 'gamma_quake'
+          ];
+          for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+
+            const isBigUlt = bigUltTypes.includes(p.type);
+            if (isBigUlt && Math.random() < 0.85) {
+              this.spawnParticles(p.x, p.y, p.color, 3, 220);
+            }
+
+            if (!p.hit && !this.koState) {
+              const d = Math.hypot(p.x - p.target.x, p.y - p.target.y);
+              if (d < p.radius + p.target.radius) {
+                p.hit = true;
+                const shown = fmtDmg(p.damage * (this.isOverdrive ? 2 : 1));
+                const tag = p.type === 'hollow_purple' ? 'PURPLE!'
+                  : p.type === 'bijuu_dama' ? 'BIJUU!'
+                  : p.type === 'bajrang_gun' ? 'BAJRANG!'
+                  : p.type === 'rumbling_wave' ? 'RUMBLING!'
+                  : p.type === 'dora_beam' ? 'BEAM!'
+                  : p.type === 'frieren_blackhole' ? 'MAGIC!'
+                  : p.type === 'stormbreaker_ult' ? 'STORM!'
+                  : p.type === 'cap_assemble_ult' ? 'ASSEMBLE!'
+                  : p.type === 'unibeam_ult' ? 'UNIBEAM!'
+                  : p.type === 'gamma_quake' ? 'GAMMA!'
+                  : '';
+                const dmgRes = this.applyDamage(p.owner, p.target, p.damage, {
+                  isCrit: isBigUlt || p.type === 'thunder_spear',
+                  color: p.color,
+                  label: tag ? `-${shown} ${tag}` : `-${shown}`,
+                  size: isBigUlt ? 44 : 30,
+                  cx: p.target.x,
+                  cy: p.target.y
+                });
+
+                if (dmgRes && !dmgRes.blocked) {
+                  if (p.owner.char.skills.passive) {
+                    p.owner.char.skills.passive(p.owner, p.target, this, 'onHitSuccess', p);
+                  }
+                  if (isBigUlt || p.type === 'thunder_spear') {
+                    this.addShake(isBigUlt ? 28 : 16);
+                    if (isBigUlt) this.triggerFlash(p.color, 0.36);
+                    this.spawnRing(p.target.x, p.target.y, 20, isBigUlt ? 290 : 140, p.color, 0.45);
+                    this.spawnParticles(p.target.x, p.target.y, p.color, isBigUlt ? 50 : 24, 620);
+                  } else if (p.type === 'shadow_clone') {
+                    this.spawnParticles(p.x, p.y, '#ffffff', 16, 260);
+                  } else if (p.type === 'air_cannon' || p.type === 'thunderclap' || p.type === 'mjolnir') {
+                    const distPush = Math.hypot(p.vx, p.vy) || 1;
+                    p.target.vx += (p.vx / distPush) * 480;
+                    p.target.vy += (p.vy / distPush) * 480;
+                  }
+                }
+                if (!isBigUlt) {
+                  this.projectiles.splice(i, 1);
+                  continue;
+                }
+              }
+            }
+
+            if (p.life <= 0) this.projectiles.splice(i, 1);
+          }
+        }
+
+        resolveBallCollision() {
+          const a = this.fighters[0];
+          const b = this.fighters[1];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = a.radius + b.radius;
+
+          if (dist < minDist && dist > 0.0001) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const overlap = (minDist - dist) * 0.5 + 0.5;
+            a.x -= nx * overlap;
+            a.y -= ny * overlap;
+            b.x += nx * overlap;
+            b.y += ny * overlap;
+
+            const rvx = b.vx - a.vx;
+            const rvy = b.vy - a.vy;
+            const velAlongNormal = rvx * nx + rvy * ny;
+            if (velAlongNormal < 0) {
+              const impulse = -velAlongNormal;
+              a.vx -= impulse * nx;
+              a.vy -= impulse * ny;
+              b.vx += impulse * nx;
+              b.vy += impulse * ny;
+            }
+
+            if (this.collisionCooldown <= 0 && !this.koState) {
+              this.collisionCooldown = 0.22;
+              const cx = (a.x + b.x) / 2;
+              const cy = (a.y + b.y) / 2;
+              a.addEnergy(8);
+              b.addEnergy(8);
+
+              this.processExchange(a, b, cx, cy, nx, ny);
+              if (!this.koState) {
+                this.processExchange(b, a, cx, cy, -nx, -ny);
+              }
+            }
+          }
+        }
+
+        processExchange(attacker, defender, cx, cy, nx, ny) {
+          const variance = 0.9 + this.rng() * 0.2;
+          const debuffMult = attacker.damageDebuffTimer > 0 ? 0.72 : 1.0;
+          let rawDmg = attacker.char.attack * (attacker.isAwakened ? 1.2 : 1.0) * debuffMult * variance;
+          const isCrit = this.rng() < attacker.char.critChance;
+          if (isCrit) rawDmg *= attacker.char.critMult;
+
+          const hitInfo = {
+            damage: Math.max(0.5, rawDmg - defender.char.defense),
+            isCrit,
+            knockbackBoost: 1.0,
+            redSlam: false,
+            cx,
+            cy
+          };
+
+          // Kích hoạt Skill 2 cận chiến nếu đã hồi chiêu
+          if (attacker.skill2Timer >= attacker.char.skill2Cd && attacker.char.skills.skill2) {
+            attacker.skill2Timer = 0;
+            attacker.char.skills.skill2(attacker, defender, this, hitInfo);
+          }
+
+          const finalDisplayDmg = fmtDmg(hitInfo.damage * (this.isOverdrive ? 2 : 1));
+          const dmgRes = this.applyDamage(attacker, defender, hitInfo.damage, {
+            isDot: false,
+            isCrit: hitInfo.isCrit,
+            color: hitInfo.redSlam ? '#ff2a55' : hitInfo.isCrit ? '#ffd60a' : '#ffffff',
+            label: hitInfo.isCrit ? `-${finalDisplayDmg} CRIT!` : `-${finalDisplayDmg}`,
+            size: hitInfo.isCrit ? 38 : 30,
+            cx,
+            cy
+          });
+
+          if (dmgRes && !dmgRes.blocked) {
+            if (attacker.char.skills.passive) {
+              attacker.char.skills.passive(attacker, defender, this, 'onHitSuccess', hitInfo);
+            }
+            if (hitInfo.knockbackBoost > 1.0) {
+              defender.vx += nx * 420 * hitInfo.knockbackBoost;
+              defender.vy += ny * 420 * hitInfo.knockbackBoost;
+            }
+            if (hitInfo.redSlam) {
+              defender.redSlamArmed = true;
+              defender.redSlamSource = attacker;
+            }
+          }
+        }
+
+        applyDamage(attacker, defender, baseAmount, opts) {
+          if (this.koState) return { blocked: true, amount: 0 };
+
+          // Overdrive Mode sau 44 giây: Nhân đôi mọi sát thương
+          const scaledAmount = baseAmount * (this.isOverdrive ? 2.0 : 1.0);
+          const dmgInfo = { amount: scaledAmount, isDot: !!opts.isDot, isReflect: !!opts.isReflect, blocked: false };
+
+          if (defender.char.skills.passive) {
+            defender.char.skills.passive(defender, attacker, this, 'onTakeDamage', dmgInfo);
+          }
+          if (dmgInfo.blocked || dmgInfo.amount <= 0) return dmgInfo;
+
+          defender.currentHp = Math.max(0, defender.currentHp - dmgInfo.amount);
+          defender.addEnergy(opts.isDot ? 2 : 6);
+          if (!opts.isDot) defender.hitFlash = 1.0; // White flash 0.1s
+
+          if (attacker) {
+            attacker.totalDamageDealt += dmgInfo.amount;
+            if (!opts.isDot) attacker.hitsLanded++;
+          }
+
+          const fx = opts.cx ?? defender.x;
+          const fy = opts.cy ?? defender.y - defender.radius * 0.5;
+          const displayLabel = opts.isDot
+            ? `-${fmtDmg(dmgInfo.amount)} ${opts.label.split(' ')[1] || ''}`.trim()
+            : opts.label;
+          this.spawnFloatingText(fx, fy - 16, displayLabel, opts.color, opts.size);
+
+          if (!opts.isDot) {
+            SoundFX.hit(opts.isCrit);
+            this.addShake(opts.isCrit ? 14 : 6);
+            this.spawnParticles(fx, fy, opts.isCrit ? '#ffd60a' : attacker.char.color, opts.isCrit ? 22 : 12, 420);
+          }
+
+          if (defender.currentHp <= 0) {
+            this.triggerKO(attacker, defender);
+          }
+          return dmgInfo;
+        }
+
+        triggerKO(winner, loser) {
+          this.koState = { winner, loser, realTimer: 0, duration: 1.5 };
+          SoundFX.ko();
+          this.addShake(34);
+          this.triggerFlash('#ffffff', 0.9);
+          this.spawnRing(loser.x, loser.y, 20, 440, winner.char.color, 0.85);
+          this.spawnRing(loser.x, loser.y, 10, 300, '#ffffff', 0.6);
+          this.spawnParticles(loser.x, loser.y, loser.char.color, 80, 780);
+          this.spawnParticles(loser.x, loser.y, '#ffffff', 40, 620);
+        }
+
+        updateVisualPools(dt) {
+          for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+            p.life -= dt;
+            if (p.life <= 0) this.particles.splice(i, 1);
+          }
+          for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            const t = this.floatingTexts[i];
+            t.y += t.vy * dt;
+            t.vy *= 0.94;
+            t.age += dt;
+            if (t.age >= t.duration) this.floatingTexts.splice(i, 1);
+          }
+          for (let i = this.skillPopups.length - 1; i >= 0; i--) {
+            const sp = this.skillPopups[i];
+            sp.age += dt;
+            if (sp.age >= sp.duration) this.skillPopups.splice(i, 1);
+          }
+          for (let i = this.rings.length - 1; i >= 0; i--) {
+            const r = this.rings[i];
+            r.age += dt;
+            if (r.age >= r.duration) this.rings.splice(i, 1);
+          }
+          for (let i = this.slashes.length - 1; i >= 0; i--) {
+            const s = this.slashes[i];
+            s.age += dt;
+            if (s.age >= s.duration) this.slashes.splice(i, 1);
+          }
+        }
+
+        updateTimerDOM() {
+          const el = document.getElementById('ui-timer');
+          if (!el) return;
+          const mins = Math.floor(this.elapsed / 60);
+          const secs = (this.elapsed % 60).toFixed(1).padStart(4, '0');
+          el.textContent = `${String(mins).padStart(2, '0')}:${secs}`;
+          el.style.color = this.elapsed >= 48 && this.elapsed <= 62 ? '#38ff7a' : this.elapsed > 62 ? '#ffaa00' : '#00f3ff';
+        }
+
+        // =====================================================================
+        // 7. HIGH-FPS CANVAS RENDERING (1080x1920)
+        // =====================================================================
+        render() {
+          ctx.save();
+
+          if (this.shakeIntensity > 0.2) {
+            ctx.translate((Math.random() - 0.5) * this.shakeIntensity * 2, (Math.random() - 0.5) * this.shakeIntensity * 2);
+          }
+
+          this.drawBackground();
+          this.drawArenaRing();
+
+          // Hố đen Thương (Gojo Blue)
+          for (const v of this.blueVortices) {
+            const pulse = Math.sin(this.time * 18) * 10;
+            ctx.save();
+            const g = ctx.createRadialGradient(v.x, v.y, 6, v.x, v.y, 92 + pulse);
+            g.addColorStop(0, '#000010');
+            g.addColorStop(0.35, 'rgba(0, 175, 255, 0.85)');
+            g.addColorStop(1, 'rgba(0, 175, 255, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, 92 + pulse, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // Nền đỏ thẫm khi Sukuna kích hoạt Malevolent Shrine
+          if (this.domainEffect) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(120, 0, 24, 0.24)';
+            ctx.beginPath();
+            ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // Shockwave Rings
+          for (const r of this.rings) {
+            const p = r.age / r.duration;
+            const radius = r.startR + (r.endR - r.startR) * (1 - Math.pow(1 - p, 3));
+            ctx.save();
+            ctx.strokeStyle = r.color;
+            ctx.globalAlpha = Math.max(0, 1 - p);
+            ctx.lineWidth = 8 * (1 - p) + 2;
+            ctx.shadowColor = r.color;
+            ctx.shadowBlur = 22;
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          // Màn hình tối dần 0.4s khi tung Ultimate (trước khi vẽ nhân vật để nhân vật nổi bật)
+          if (this.ultCinematic.active) {
+            const p = this.ultCinematic.timer / this.ultCinematic.duration;
+            const dim = p < 0.2 ? (p / 0.2) * 0.6 : (1 - (p - 0.2) / 0.8) * 0.6;
+            ctx.fillStyle = `rgba(4, 4, 10, ${Math.max(0, dim)})`;
+            ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+          }
+
+          // Vẽ 2 quả bóng nhân vật đa tầng
+          for (const f of this.fighters) {
+            if (f.currentHp <= 0 && this.koState && this.koState.realTimer > 0.35) continue;
+            this.drawFighter(f);
+          }
+
+          // Vẽ Đạn / Chưởng (Dismantle & Hollow Purple)
+          this.drawProjectiles();
+
+          // Vết chém (Cleave / Malevolent Shrine)
+          for (const s of this.slashes) {
+            const p = s.age / s.duration;
+            ctx.save();
+            ctx.translate(s.x, s.y);
+            ctx.rotate(s.angle);
+            ctx.strokeStyle = s.color;
+            ctx.globalAlpha = 1 - p;
+            ctx.lineWidth = 7 * (1 - p) + 2;
+            ctx.shadowColor = s.color;
+            ctx.shadowBlur = 18;
+            ctx.beginPath();
+            ctx.moveTo(-s.length / 2, 0);
+            ctx.lineTo(s.length / 2, 0);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          // Hạt tia lửa
+          for (const p of this.particles) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // Số sát thương nhảy
+          for (const t of this.floatingTexts) {
+            const p = t.age / t.duration;
+            const sc = p < 0.15 ? 0.75 + (p / 0.15) * 0.4 : 1.15 - p * 0.15;
+            ctx.save();
+            ctx.globalAlpha = p > 0.65 ? Math.max(0, 1 - (p - 0.65) / 0.35) : 1;
+            ctx.translate(t.x, t.y);
+            ctx.scale(sc, sc);
+            ctx.font = `900 ${t.size}px 'Segoe UI', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#07070c';
+            ctx.strokeText(t.text, 0, 0);
+            ctx.fillStyle = t.color;
+            ctx.fillText(t.text, 0, 0);
+            ctx.restore();
+          }
+
+          // Manga-style Skill Popups (Phóng to -> Thu nhỏ nhanh)
+          for (const sp of this.skillPopups) {
+            const p = sp.age / sp.duration;
+            let sc = 1.0;
+            if (p < 0.14) sc = 0.4 + (p / 0.14) * 0.95;       // Pop lên 1.35x
+            else if (p < 0.28) sc = 1.35 - ((p - 0.14) / 0.14) * 0.35; // Thu nhanh về 1.0x
+            const alpha = p > 0.72 ? Math.max(0, 1 - (p - 0.72) / 0.28) : 1;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(sp.x, sp.y - p * 26);
+            ctx.scale(sc, sc);
+            ctx.font = `900 ${sp.size}px 'Segoe UI', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = sp.color;
+            ctx.shadowBlur = 18;
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#050508';
+            ctx.strokeText(sp.text, 0, 0);
+            ctx.fillStyle = sp.color;
+            ctx.fillText(sp.text, 0, 0);
+            ctx.restore();
+          }
+
+          // Tên Ultimate lớn ở phía trên vòng tròn sàn đấu (không che tầm nhìn 2 quả bóng)
+          if (this.ultCinematic.active) {
+            const p = this.ultCinematic.timer / this.ultCinematic.duration;
+            const sc = p < 0.25 ? 1.38 - (p / 0.25) * 0.38 : 1.0;
+            ctx.save();
+            ctx.translate(ARENA_CX, 448);
+            ctx.scale(sc, sc);
+            ctx.font = `900 72px 'Segoe UI', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = this.ultCinematic.color;
+            ctx.shadowBlur = 36;
+            ctx.lineWidth = 11;
+            ctx.strokeStyle = '#050508';
+            ctx.strokeText(this.ultCinematic.text, 0, 0);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(this.ultCinematic.text, 0, 0);
+            ctx.restore();
+          }
+
+          this.drawTopHUD();
+          this.drawBottomHUD();
+
+          if (this.flash.alpha > 0.01) {
+            ctx.save();
+            ctx.fillStyle = this.flash.color;
+            ctx.globalAlpha = this.flash.alpha;
+            ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+            ctx.restore();
+          }
+
+          if (this.koState) {
+            this.drawKOOverlay();
+          }
+
+          ctx.restore();
+        }
+
+        drawBackground() {
+          ctx.fillStyle = '#0d0d12';
+          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+          const bgGrad = ctx.createRadialGradient(ARENA_CX, ARENA_CY, 60, ARENA_CX, ARENA_CY, 700);
+          bgGrad.addColorStop(0, this.isOverdrive ? 'rgba(255, 0, 60, 0.16)' : 'rgba(0, 200, 255, 0.09)');
+          bgGrad.addColorStop(1, 'rgba(13, 13, 18, 0)');
+          ctx.fillStyle = bgGrad;
+          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let x = 0; x <= CANVAS_W; x += 60) { ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); }
+          for (let y = 0; y <= CANVAS_H; y += 60) { ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); }
+          ctx.stroke();
+        }
+
+        drawArenaRing() {
+          if (this.isShrinking) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([14, 14]);
+            ctx.beginPath();
+            ctx.arc(ARENA_CX, ARENA_CY, ARENA_INITIAL_RADIUS, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.save();
+          ctx.fillStyle = 'rgba(8, 9, 14, 0.88)';
+          ctx.beginPath();
+          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          const ringColor = this.isOverdrive ? '#ff003c' : this.isShrinking ? '#ff8800' : '#00f3ff';
+          ctx.strokeStyle = ringColor;
+          ctx.lineWidth = 9;
+          ctx.shadowColor = ringColor;
+          ctx.shadowBlur = 28 + Math.sin(this.time * 7) * 8;
+          ctx.beginPath();
+          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        drawAvatarAt(character, x, y, r, isAwakened = false) {
+          if (character.avatarLoaded && character.avatarImg) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.clip();
+            const img = character.avatarImg;
+            const scale = Math.max((r * 2) / img.width, (r * 2) / img.height);
+            const dw = img.width * scale;
+            const dh = img.height * scale;
+            ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
+            ctx.restore();
+          } else {
+            character.drawFallbackAvatar(ctx, x, y, r, isAwakened);
+          }
+        }
+
+        drawFighter(f) {
+          const r = f.radius * f.ultScale;
+
+          // 1. Afterimage Trail
+          for (let i = 0; i < f.trail.length; i++) {
+            const pt = f.trail[i];
+            const ratio = (i + 1) / f.trail.length;
+            ctx.save();
+            ctx.globalAlpha = ratio * 0.22;
+            ctx.fillStyle = f.char.color;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, r * (0.45 + ratio * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // 2. Lớp Aura ngoài (gấp đôi kích thước khi Awakening < 30% HP)
+          ctx.save();
+          const auraSize = f.isAwakened ? 34 : 16;
+          const auraGrad = ctx.createRadialGradient(f.x, f.y, r * 0.8, f.x, f.y, r + auraSize);
+          auraGrad.addColorStop(0, f.char.color);
+          auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.globalAlpha = f.isAwakened ? 0.65 : 0.35;
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, r + auraSize, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 3. Custom Character Effects (Hexagon Shield, Awakening Fire, Charge Orbs)
+          if (f.char.drawCustomEffects) {
+            f.char.drawCustomEffects(ctx, f, this.time);
+          }
+
+          // 4. Core Avatar (URL Image hoặc Canvas Fallback chi tiết)
+          ctx.save();
+          ctx.shadowColor = f.char.color;
+          ctx.shadowBlur = f.isAwakened ? 38 : 22;
+          this.drawAvatarAt(f.char, f.x, f.y, r, f.isAwakened);
+
+          // Viền Neon ngoài
+          ctx.lineWidth = f.isAwakened ? 8 : 5.5;
+          ctx.strokeStyle = f.hitFlash > 0.15 ? '#ffffff' : f.char.color;
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // White Flash 0.1s khi dính đòn
+          if (f.hitFlash > 0.05) {
+            ctx.globalAlpha = f.hitFlash * 0.78;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+
+          // 5. Viền đỏ đứt đoạn nếu đang bị dính Bleed
+          if (f.bleedStacks.length > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#ff003c';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([8, 7]);
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, r + 8, -this.time * 6, -this.time * 6 + Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          // 6. Huy hiệu số máu hình viên thuốc ngay đáy avatar nhân vật (gọn hơn 30% so với ảnh mẫu)
+          ctx.save();
+          const pillW = r * 1.16;
+          const pillH = r * 0.52;
+          const pillX = f.x - pillW / 2;
+          const pillY = f.y + r * 0.88 - pillH / 2;
+
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+          ctx.shadowBlur = 10;
+          ctx.fillStyle = '#0b0c12';
+          this.roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+          ctx.fill();
+
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = '#f3d8b8';
+          ctx.lineWidth = 2.6;
+          this.roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+          ctx.stroke();
+
+          ctx.font = `800 ${Math.round(pillH * 0.74)}px 'Georgia', 'Segoe UI', serif`;
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(Math.max(0, Math.ceil(f.currentHp))), f.x, pillY + pillH / 2 + 1);
+          ctx.restore();
+        }
+
+        drawProjectiles() {
+          for (const p of this.projectiles) {
+            ctx.save();
+            if (p.type === 'hollow_purple') {
+              const g = ctx.createRadialGradient(p.x, p.y, 12, p.x, p.y, p.radius);
+              g.addColorStop(0, '#ffffff');
+              g.addColorStop(0.35, '#d147ff');
+              g.addColorStop(0.75, '#5a189a');
+              g.addColorStop(1, 'rgba(181, 23, 255, 0)');
+              ctx.fillStyle = g;
+              ctx.shadowColor = '#d147ff';
+              ctx.shadowBlur = 40;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (p.type === 'bijuu_dama') {
+              const g = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, p.radius);
+              g.addColorStop(0, '#1a0600');
+              g.addColorStop(0.45, '#7a0b00');
+              g.addColorStop(0.78, '#ff5400');
+              g.addColorStop(1, 'rgba(255, 145, 0, 0)');
+              ctx.fillStyle = g;
+              ctx.shadowColor = '#ff5400';
+              ctx.shadowBlur = 38;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (p.type === 'bajrang_gun') {
+              const g = ctx.createRadialGradient(p.x, p.y, 16, p.x, p.y, p.radius);
+              g.addColorStop(0, '#ffffff');
+              g.addColorStop(0.5, '#ffe8b6');
+              g.addColorStop(0.8, '#ff3b30');
+              g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+              ctx.fillStyle = g;
+              ctx.shadowColor = '#ffffff';
+              ctx.shadowBlur = 42;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (p.type === 'shadow_clone') {
+              ctx.globalAlpha = 0.9;
+              this.drawAvatarAt(p.owner.char, p.x, p.y, p.radius, p.owner.isAwakened);
+              ctx.strokeStyle = '#ffb703';
+              ctx.lineWidth = 4;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+              ctx.stroke();
+            } else if (p.type === 'jet_pistol') {
+              ctx.translate(p.x, p.y);
+              ctx.rotate(p.angle);
+              ctx.strokeStyle = '#ff595e';
+              ctx.lineWidth = 14;
+              ctx.lineCap = 'round';
+              ctx.shadowColor = '#ff3b30';
+              ctx.shadowBlur = 18;
+              ctx.beginPath();
+              ctx.moveTo(-48, 0);
+              ctx.lineTo(14, 0);
+              ctx.stroke();
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(16, 0, 14, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (
+              p.type === 'rumbling_wave' || p.type === 'dora_beam' || p.type === 'frieren_blackhole' ||
+              p.type === 'stormbreaker_ult' || p.type === 'cap_assemble_ult' || p.type === 'unibeam_ult' || p.type === 'gamma_quake'
+            ) {
+              const g = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, p.radius);
+              g.addColorStop(0, p.type === 'frieren_blackhole' ? '#070514' : '#ffffff');
+              g.addColorStop(0.5, p.color);
+              g.addColorStop(1, 'rgba(0,0,0,0)');
+              ctx.fillStyle = g;
+              ctx.shadowColor = p.color;
+              ctx.shadowBlur = 40;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (p.type === 'vibranium_shield') {
+              // Khiên Vibranium đỏ - trắng - xanh xoay cực nhanh
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.85, 0, Math.PI * 2); ctx.fill();
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.62, 0, Math.PI * 2); ctx.fill();
+              ctx.fillStyle = '#2563eb';
+              ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.38, 0, Math.PI * 2); ctx.fill();
+            } else if (p.type === 'mjolnir') {
+              ctx.translate(p.x, p.y);
+              ctx.rotate(this.time * 18);
+              ctx.fillStyle = '#cbd5e1';
+              ctx.shadowColor = '#38bdf8';
+              ctx.shadowBlur = 18;
+              ctx.fillRect(-20, -14, 40, 28);
+              ctx.fillStyle = '#92400e';
+              ctx.fillRect(-5, 14, 10, 22);
+            } else if (p.type === 'repulsor_blast') {
+              ctx.translate(p.x, p.y);
+              ctx.rotate(p.angle);
+              ctx.strokeStyle = '#ffffff';
+              ctx.shadowColor = '#38bdf8';
+              ctx.shadowBlur = 18;
+              ctx.lineWidth = 10;
+              ctx.lineCap = 'round';
+              ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(18, 0); ctx.stroke();
+            } else if (p.type === 'warhammer_spike' || p.type === 'thunder_spear') {
+              ctx.translate(p.x, p.y);
+              ctx.rotate(p.angle);
+              ctx.fillStyle = p.color;
+              ctx.shadowColor = p.color;
+              ctx.shadowBlur = 16;
+              ctx.beginPath();
+              ctx.moveTo(28, 0);
+              ctx.lineTo(-22, -9);
+              ctx.lineTo(-16, 0);
+              ctx.lineTo(-22, 9);
+              ctx.closePath();
+              ctx.fill();
+            } else if (p.type === 'air_cannon' || p.type === 'thunderclap') {
+              ctx.strokeStyle = p.type === 'thunderclap' ? '#4ade80' : '#ffffff';
+              ctx.shadowColor = p.color;
+              ctx.shadowBlur = 20;
+              ctx.lineWidth = 7;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.radius * 0.72, 0, Math.PI * 2);
+              ctx.stroke();
+            } else if (p.type === 'dismantle') {
+              ctx.translate(p.x, p.y);
+              ctx.rotate(p.angle);
+              ctx.strokeStyle = '#ffffff';
+              ctx.shadowColor = '#ff003c';
+              ctx.shadowBlur = 18;
+              ctx.lineWidth = 5;
+              ctx.beginPath();
+              ctx.arc(0, 0, 32, -0.75, 0.75);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+        }
+
+        drawTopHUD() {
+          const p1 = this.fighters[0];
+          const p2 = this.fighters[1];
+
+          ctx.save();
+          ctx.font = `900 44px 'Segoe UI', Impact, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = 'rgba(0, 243, 255, 0.45)';
+          ctx.shadowBlur = 16;
+          ctx.fillText(`${p1.char.name}  VS  ${p2.char.name}`, ARENA_CX, 112);
+
+          ctx.font = `700 22px 'Segoe UI', sans-serif`;
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = this.isOverdrive ? '#ffd60a' : '#9aa3c4';
+          ctx.fillText(
+            this.isOverdrive ? '⚡ OVERDRIVE MODE — 2X DAMAGE ACTIVE ⚡' : 'LORE ACCURATE ARENA • WHO WINS?',
+            ARENA_CX,
+            150
+          );
+          ctx.restore();
+
+          this.drawFighterHUD(p1, 48, 200, 445, true);
+          this.drawFighterHUD(p2, CANVAS_W - 48 - 445, 200, 445, false);
+
+          // Huy hiệu VS giữa 2 thanh trạng thái
+          ctx.save();
+          ctx.fillStyle = '#181a24';
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(ARENA_CX, 242, 36, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.font = `900 30px 'Segoe UI', Impact, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#ffd60a';
+          ctx.fillText('VS', ARENA_CX, 244);
+          ctx.restore();
+        }
+
+        drawFighterHUD(f, x, y, width, isLeft) {
+          const barH = 34;
+          const avR = 36;
+          const barX = isLeft ? x + 52 : x;
+          const barW = width - 52;
+
+          ctx.save();
+          // Tên nhân vật viết hoa (đã chuyển số máu xuống avatar quả bóng)
+          ctx.font = `900 26px 'Segoe UI', sans-serif`;
+          ctx.fillStyle = f.char.color;
+          ctx.textAlign = isLeft ? 'left' : 'right';
+          ctx.fillText(f.char.name, isLeft ? x + 82 : x + width - 82, y - 10);
+
+          // 1. Thanh HP
+          ctx.fillStyle = '#1b1d29';
+          this.roundRect(ctx, barX, y + 6, barW, barH, 9);
+          ctx.fill();
+
+          const trailPct = Math.max(0, f.trailHp / f.maxHp);
+          const hpPct = Math.max(0, f.displayHp / f.maxHp);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          if (isLeft) this.roundRect(ctx, barX, y + 6, barW * trailPct, barH, 9);
+          else this.roundRect(ctx, barX + barW * (1 - trailPct), y + 6, barW * trailPct, barH, 9);
+          ctx.fill();
+
+          const hpColor = f.side === 0 ? '#00d9ff' : '#ff1e42';
+          ctx.fillStyle = hpColor;
+          ctx.shadowColor = hpColor;
+          ctx.shadowBlur = 10;
+          if (isLeft) this.roundRect(ctx, barX, y + 6, barW * hpPct, barH, 9);
+          else this.roundRect(ctx, barX + barW * (1 - hpPct), y + 6, barW * hpPct, barH, 9);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx.lineWidth = 2;
+          this.roundRect(ctx, barX, y + 6, barW, barH, 9);
+          ctx.stroke();
+
+          // 2. Thanh Năng lượng (Energy Bar 0-100 vàng/tím ngay dưới HP)
+          const enY = y + barH + 14;
+          const enH = 14;
+          ctx.fillStyle = '#141621';
+          this.roundRect(ctx, barX, enY, barW, enH, 6);
+          ctx.fill();
+
+          const enPct = Math.max(0, Math.min(1, f.displayEnergy / 100));
+          const enGrad = ctx.createLinearGradient(barX, enY, barX + barW, enY);
+          enGrad.addColorStop(0, '#ffd60a');
+          enGrad.addColorStop(1, '#c77dff');
+          ctx.fillStyle = enGrad;
+          if (isLeft) this.roundRect(ctx, barX, enY, barW * enPct, enH, 6);
+          else this.roundRect(ctx, barX + barW * (1 - enPct), enY, barW * enPct, enH, 6);
+          ctx.fill();
+
+          // 3. Icon trạng thái nhỏ (Khiên Gojo / Chảy máu Sukuna / Awakening)
+          const badges = [];
+          if (f.char.id === 'gojo') {
+            if (f.custom.shieldActive) badges.push({ text: '⬡ INFINITY', color: '#00f3ff' });
+            else badges.push({ text: `⬡ CD ${Math.ceil(f.custom.shieldCooldown - f.custom.shieldTimer)}s`, color: '#6b7a99' });
+          }
+          if (f.bleedStacks.length > 0) {
+            badges.push({ text: `🩸 BLEED x${f.bleedStacks.length}`, color: '#ff2a55' });
+          }
+          if (f.isAwakened) {
+            badges.push({ text: '🔥 AWAKENED', color: '#ffd60a' });
+          }
+
+          let bx = isLeft ? barX + 26 : barX + barW - 26;
+          ctx.font = `800 18px 'Segoe UI', sans-serif`;
+          ctx.textAlign = isLeft ? 'left' : 'right';
+          for (const b of badges) {
+            ctx.fillStyle = b.color;
+            ctx.fillText(b.text, bx, enY + 34);
+            bx += isLeft ? 132 : -132;
+          }
+
+          // 3.5. Hiển thị Tên Skill ngay dưới vạch máu (không che tầm nhìn sàn đấu!)
+          if (f.activeSkillCallout) {
+            const scObj = f.activeSkillCallout;
+            const p = scObj.age / scObj.duration;
+            let pop = 1.0;
+            if (p < 0.12) pop = 0.65 + (p / 0.12) * 0.5;
+            else if (p < 0.24) pop = 1.15 - ((p - 0.12) / 0.12) * 0.15;
+            const alpha = p > 0.78 ? Math.max(0, 1 - (p - 0.78) / 0.22) : 1;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            const sx = isLeft ? barX + 26 : barX + barW - 26;
+            const sy = enY + 74;
+            ctx.translate(sx, sy);
+            ctx.scale(pop, pop);
+            ctx.font = `900 26px 'Segoe UI', Impact, sans-serif`;
+            ctx.textAlign = isLeft ? 'left' : 'right';
+            ctx.shadowColor = scObj.color;
+            ctx.shadowBlur = 16;
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#050508';
+            ctx.strokeText(scObj.text, 0, 0);
+            ctx.fillStyle = scObj.color;
+            ctx.fillText(scObj.text, 0, 0);
+            ctx.restore();
+          }
+
+          // 4. Avatar tròn ở đầu thanh trạng thái
+          const avX = isLeft ? x + 36 : x + width - 36;
+          const avY = y + 32;
+          this.drawAvatarAt(f.char, avX, avY, avR, f.isAwakened);
+          ctx.strokeStyle = f.char.color;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        drawBottomHUD() {
+          ctx.save();
+          const mins = Math.floor(this.elapsed / 60);
+          const secs = (this.elapsed % 60).toFixed(1).padStart(4, '0');
+          ctx.font = `800 32px 'Consolas', monospace`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+          ctx.fillText(`⏱ ${String(mins).padStart(2, '0')}:${secs}`, ARENA_CX, 1630);
+
+          if (this.isOverdrive) {
+            ctx.font = `900 26px 'Segoe UI', sans-serif`;
+            ctx.fillStyle = '#ffd60a';
+            ctx.fillText('⚡ OVERDRIVE: 2X DAMAGE ⚡', ARENA_CX, 1676);
+          } else if (this.isShrinking) {
+            ctx.font = `800 24px 'Segoe UI', sans-serif`;
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillText('⚠ ARENA SHRINKING', ARENA_CX, 1676);
+          }
+
+          ctx.font = `700 28px 'Segoe UI', sans-serif`;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.56)';
+          ctx.fillText('Comment the next battle! Top comment wins 👇', ARENA_CX, 1805);
+          ctx.restore();
+        }
+
+        // Bảng kết quả cuối trận hoàn toàn bằng TIẾNG ANH
+        drawKOOverlay() {
+          const { winner, realTimer } = this.koState;
+          const fade = Math.min(1, realTimer / 0.45);
+
+          ctx.save();
+          ctx.fillStyle = `rgba(5, 6, 11, ${fade * 0.65})`;
+          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+          const popScale = realTimer < 0.25 ? 1.85 - (realTimer / 0.25) * 0.85 : 1.0;
+          ctx.translate(ARENA_CX, 815);
+          ctx.scale(popScale, popScale);
+          ctx.font = `900 160px 'Segoe UI', Impact, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.shadowColor = winner.char.color;
+          ctx.shadowBlur = 45;
+          ctx.lineWidth = 14;
+          ctx.strokeStyle = '#07070c';
+          ctx.strokeText('K.O!', 0, 0);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('K.O!', 0, 0);
+          ctx.restore();
+
+          if (realTimer > 0.4) {
+            const cardFade = Math.min(1, (realTimer - 0.4) / 0.35);
+            ctx.save();
+            ctx.globalAlpha = cardFade;
+
+            ctx.font = `900 68px 'Segoe UI', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = winner.char.color;
+            ctx.shadowBlur = 30;
+            ctx.fillStyle = winner.char.color;
+            ctx.fillText(`${winner.char.name} WINS!`, ARENA_CX, 955);
+            ctx.shadowBlur = 0;
+
+            const boxW = 680;
+            const boxH = 235;
+            const boxX = ARENA_CX - boxW / 2;
+            const boxY = 1015;
+
+            ctx.fillStyle = 'rgba(16, 18, 28, 0.94)';
+            ctx.strokeStyle = winner.char.color;
+            ctx.lineWidth = 4;
+            this.roundRect(ctx, boxX, boxY, boxW, boxH, 24);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.font = `800 34px 'Segoe UI', sans-serif`;
+            ctx.fillStyle = '#f2f5ff';
+            ctx.fillText(`Remaining HP: ${Math.ceil(winner.currentHp)} / ${winner.maxHp}`, ARENA_CX, boxY + 70);
+            ctx.fillText(`Match Duration: ${this.elapsed.toFixed(1)}s`, ARENA_CX, boxY + 130);
+
+            ctx.fillStyle = '#9aa4c7';
+            ctx.font = `600 26px 'Segoe UI', sans-serif`;
+            ctx.fillText(
+              `Total Damage: ${Math.round(winner.totalDamageDealt)}  •  Hits Landed: ${winner.hitsLanded}`,
+              ARENA_CX,
+              boxY + 188
+            );
+
+            ctx.restore();
+          }
+        }
+
+        roundRect(c, x, y, w, h, r) {
+          if (w <= 0) { c.beginPath(); return; }
+          const radius = Math.min(r, w / 2, h / 2);
+          c.beginPath();
+          c.moveTo(x + radius, y);
+          c.arcTo(x + w, y, x + w, y + h, radius);
+          c.arcTo(x + w, y + h, x, y + h, radius);
+          c.arcTo(x, y + h, x, y, radius);
+          c.arcTo(x, y, x + w, y, radius);
+          c.closePath();
+        }
+      }
+
+      // =========================================================================
+      // 8. CREATOR CONTROLS & 60 FPS GAME LOOP
+      // =========================================================================
+      const game = new BattleArena();
+
+      const panel = document.getElementById('creator-panel');
+      const btnStart = document.getElementById('btn-start');
+      const btnRestart = document.getElementById('btn-restart');
+      const btnRandom = document.getElementById('btn-random');
+      const btnSfx = document.getElementById('btn-sfx');
+      const inputAvatarP1 = document.getElementById('input-avatar-p1');
+      const inputAvatarP2 = document.getElementById('input-avatar-p2');
+      const inputSeed = document.getElementById('input-seed');
+      const sliderSpeed = document.getElementById('slider-speed');
+      const labelSpeed = document.getElementById('label-speed');
+      const toast = document.getElementById('toast');
+
+      // Searchable Character Picker Component (Hỗ trợ gõ tìm nhanh khi có nhiều nhân vật)
+      const allPickers = [];
+      function createSearchablePicker(containerId, initialId, onSelect) {
+        const root = document.getElementById(containerId);
+        let selectedId = initialId;
+
+        root.innerHTML = `
+          <button type="button" class="char-picker-btn">
+            <span class="char-picker-label"></span>
+            <span style="opacity:0.65; font-size:10px;">▼</span>
+          </button>
+          <div class="char-picker-menu">
+            <input type="text" class="char-picker-search" placeholder="🔍 Search character..." autocomplete="off" />
+            <div class="char-picker-list"></div>
+          </div>
+        `;
+
+        const btn = root.querySelector('.char-picker-btn');
+        const labelEl = root.querySelector('.char-picker-label');
+        const menu = root.querySelector('.char-picker-menu');
+        const searchInput = root.querySelector('.char-picker-search');
+        const listEl = root.querySelector('.char-picker-list');
+
+        function renderButton() {
+          const ch = CHARACTER_REGISTRY[selectedId];
+          labelEl.innerHTML = `<span class="char-dot" style="background:${ch.color}; box-shadow:0 0 8px ${ch.color};"></span><span>${ch.name}</span>`;
+        }
+
+        function renderList(query = '') {
+          const q = query.trim().toLowerCase();
+          const keys = Object.keys(CHARACTER_REGISTRY).filter((k) => {
+            const ch = CHARACTER_REGISTRY[k];
+            return !q || ch.name.toLowerCase().includes(q) || ch.id.toLowerCase().includes(q);
+          });
+
+          listEl.innerHTML = '';
+          if (keys.length === 0) {
+            listEl.innerHTML = `<div class="char-picker-empty">No character found</div>`;
+            return;
+          }
+
+          for (const k of keys) {
+            const ch = CHARACTER_REGISTRY[k];
+            const item = document.createElement('div');
+            item.className = 'char-picker-item' + (k === selectedId ? ' active' : '');
+            item.innerHTML = `<span class="char-dot" style="background:${ch.color};"></span><span>${ch.name}</span>`;
+            item.addEventListener('click', () => {
+              selectedId = k;
+              renderButton();
+              closeMenu();
+              onSelect(k);
+            });
+            listEl.appendChild(item);
+          }
+        }
+
+        function openMenu() {
+          allPickers.forEach((p) => p.close());
+          menu.classList.add('open');
+          searchInput.value = '';
+          renderList('');
+          setTimeout(() => searchInput.focus(), 10);
+        }
+
+        function closeMenu() {
+          menu.classList.remove('open');
+        }
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (menu.classList.contains('open')) closeMenu();
+          else openMenu();
+        });
+
+        searchInput.addEventListener('input', () => renderList(searchInput.value));
+        searchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeMenu();
+          if (e.key === 'Enter') {
+            const firstItem = listEl.querySelector('.char-picker-item');
+            if (firstItem) firstItem.click();
+          }
+        });
+        menu.addEventListener('click', (e) => e.stopPropagation());
+
+        renderButton();
+        const api = {
+          getValue: () => selectedId,
+          setValue: (id) => {
+            if (!CHARACTER_REGISTRY[id]) return;
+            selectedId = id;
+            renderButton();
+          },
+          close: closeMenu
+        };
+        allPickers.push(api);
+        return api;
+      }
+
+      document.addEventListener('click', () => allPickers.forEach((p) => p.close()));
+
+      const pickerP1 = createSearchablePicker('picker-p1', game.p1Id, (id) => {
+        inputAvatarP1.value = CHARACTER_REGISTRY[id].avatarUrl || '';
+        restartMatch(false);
+      });
+      const pickerP2 = createSearchablePicker('picker-p2', game.p2Id, (id) => {
+        inputAvatarP2.value = CHARACTER_REGISTRY[id].avatarUrl || '';
+        restartMatch(false);
+      });
+
+      // =========================================================================
+      // 9. FULL HD 1080p (1080x1920 @ 60 FPS) VIDEO RECORDER ENGINE
+      //    Quay trực tiếp từ Canvas 1080x1920 + Web Audio SFX, không dính UI Panel
+      // =========================================================================
+      const btnRecordToggle = document.getElementById('btn-record-toggle');
+      const btnHideUi = document.getElementById('btn-hide-ui');
+      const btnShowUi = document.getElementById('btn-show-ui');
+
+      const MatchRecorder = {
+        autoRecord: false,
+        recorder: null,
+        chunks: [],
+        isRecording: false,
+        mimeType: 'video/webm',
+        ext: 'webm',
+
+        pickMimeType() {
+          const candidates = [
+            { mime: 'video/mp4;codecs=avc1,mp4a.40.2', ext: 'mp4' },
+            { mime: 'video/mp4', ext: 'mp4' },
+            { mime: 'video/webm;codecs=vp9,opus', ext: 'webm' },
+            { mime: 'video/webm;codecs=vp8,opus', ext: 'webm' },
+            { mime: 'video/webm', ext: 'webm' }
+          ];
+          for (const c of candidates) {
+            if (window.MediaRecorder && MediaRecorder.isTypeSupported(c.mime)) {
+              return c;
+            }
+          }
+          return { mime: 'video/webm', ext: 'webm' };
+        },
+
+        updateButton() {
+          if (this.isRecording) {
+            btnRecordToggle.textContent = '⏹ REC 1080p...';
+            btnRecordToggle.classList.add('rec-on');
+          } else {
+            btnRecordToggle.classList.remove('rec-on');
+            btnRecordToggle.textContent = this.autoRecord ? '🔴 Auto-Rec 1080p: ON' : '🔴 Auto-Rec 1080p: OFF';
+          }
+        },
+
+        start() {
+          if (this.isRecording || !window.MediaRecorder || !canvas.captureStream) return;
+          const picked = this.pickMimeType();
+          this.mimeType = picked.mime;
+          this.ext = picked.ext;
+          this.chunks = [];
+
+          // Lấy luồng 1080x1920 60 FPS từ Canvas + luồng âm thanh SFX
+          const videoStream = canvas.captureStream(60);
+          const tracks = [...videoStream.getVideoTracks(), ...SoundFX.getAudioTracks()];
+          const combined = new MediaStream(tracks);
+
+          try {
+            this.recorder = new MediaRecorder(combined, {
+              mimeType: this.mimeType,
+              videoBitsPerSecond: 12000000, // 12 Mbps Full HD 1080p sắc nét
+              audioBitsPerSecond: 128000    // 128 kbps audio liên tục không bị rớt tiếng
+            });
+          } catch (e) {
+            this.recorder = new MediaRecorder(combined);
+          }
+
+          this.recorder.ondataavailable = (ev) => {
+            if (ev.data && ev.data.size > 0) this.chunks.push(ev.data);
+          };
+
+          this.recorder.onstop = () => {
+            const blob = new Blob(this.chunks, { type: this.mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const p1 = game.p1Id;
+            const p2 = game.p2Id;
+            a.href = url;
+            a.download = `battle_${p1}_vs_${p2}_seed${game.seed}_1080p.${this.ext}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            this.isRecording = false;
+            this.updateButton();
+            showToast(`✅ Đã lưu video 1080p (.${this.ext})!`);
+          };
+
+          this.recorder.start(250);
+          this.isRecording = true;
+          this.updateButton();
+          showToast('🔴 Đang quay Full HD 1080p 60fps — Tự động lưu khi hiện kết quả!');
+        },
+
+        stop() {
+          if (this.recorder && this.isRecording && this.recorder.state !== 'inactive') {
+            this.recorder.stop();
+          }
+        },
+
+        checkAutoStop() {
+          // Tự động dừng và xuất video sau khi hiện bảng kết quả K.O được ~2.2 giây
+          if (this.isRecording && game.koState && game.koState.realTimer >= 3.2) {
+            this.stop();
+          }
+        }
+      };
+
+      function toggleUI() {
+        const hidden = panel.classList.toggle('hidden');
+        btnShowUi.classList.toggle('visible', hidden);
+        if (hidden) showToast('Creator Panel hidden — Click Show UI or press H');
+      }
+
+      btnHideUi.addEventListener('click', toggleUI);
+      btnShowUi.addEventListener('click', toggleUI);
+
+      btnRecordToggle.addEventListener('click', () => {
+        if (MatchRecorder.isRecording) {
+          MatchRecorder.stop();
+          return;
+        }
+        MatchRecorder.autoRecord = !MatchRecorder.autoRecord;
+        MatchRecorder.updateButton();
+        if (MatchRecorder.autoRecord) {
+          showToast('🔴 Auto-Rec 1080p ON — Bấm Start để bắt đầu quay!');
+        }
+      });
+
+      function syncStartBtn() {
+        btnStart.textContent = game.running ? '⏸ Pause' : '▶ Start';
+      }
+
+      function toggleRun() {
+        SoundFX.ensure();
+        if (game.koState) {
+          game.reset();
+          game.running = true;
+          if (MatchRecorder.autoRecord && !MatchRecorder.isRecording) {
+            MatchRecorder.start();
+          }
+        } else {
+          const startingFresh = !game.running && game.elapsed === 0;
+          game.running = !game.running;
+          if (startingFresh && MatchRecorder.autoRecord && !MatchRecorder.isRecording) {
+            MatchRecorder.start();
+          }
+        }
+        syncStartBtn();
+      }
+
+      function restartMatch(autoStart = true) {
+        SoundFX.ensure();
+        if (MatchRecorder.isRecording) MatchRecorder.stop();
+        game.seed = inputSeed.value.trim() || '7772026';
+        game.p1Id = pickerP1.getValue();
+        game.p2Id = pickerP2.getValue();
+        game.reset();
+        game.running = autoStart;
+        if (autoStart && MatchRecorder.autoRecord) {
+          MatchRecorder.start();
+        }
+        syncStartBtn();
+      }
+
+      btnStart.addEventListener('click', toggleRun);
+      btnRestart.addEventListener('click', () => restartMatch(true));
+
+      document.getElementById('btn-random-match').addEventListener('click', () => {
+        const keys = Object.keys(CHARACTER_REGISTRY);
+        const i1 = Math.floor(Math.random() * keys.length);
+        let i2 = Math.floor(Math.random() * keys.length);
+        if (keys.length > 1) {
+          while (i2 === i1) i2 = Math.floor(Math.random() * keys.length);
+        }
+        pickerP1.setValue(keys[i1]);
+        pickerP2.setValue(keys[i2]);
+        inputAvatarP1.value = CHARACTER_REGISTRY[keys[i1]].avatarUrl || '';
+        inputAvatarP2.value = CHARACTER_REGISTRY[keys[i2]].avatarUrl || '';
+        inputSeed.value = String(Math.floor(100000 + Math.random() * 900000));
+        restartMatch(true);
+      });
+
+      btnRandom.addEventListener('click', () => {
+        inputSeed.value = String(Math.floor(100000 + Math.random() * 900000));
+        restartMatch(true);
+      });
+
+      btnSfx.addEventListener('click', () => {
+        SoundFX.enabled = !SoundFX.enabled;
+        btnSfx.textContent = SoundFX.enabled ? '🔊 SFX: ON' : '🔇 SFX: OFF';
+      });
+
+      inputAvatarP1.addEventListener('change', () => {
+        CHARACTER_REGISTRY[pickerP1.getValue()].setAvatarUrl(inputAvatarP1.value);
+      });
+      inputAvatarP2.addEventListener('change', () => {
+        CHARACTER_REGISTRY[pickerP2.getValue()].setAvatarUrl(inputAvatarP2.value);
+      });
+
+      inputSeed.addEventListener('change', () => restartMatch(false));
+
+      sliderSpeed.addEventListener('input', () => {
+        game.userSpeed = parseFloat(sliderSpeed.value);
+        labelSpeed.textContent = `${game.userSpeed.toFixed(2).replace(/\.00$/, '.0')}x`;
+      });
+
+      let toastTimer = null;
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
+        const k = e.key.toLowerCase();
+        if (k === 'h') {
+          toggleUI();
+        } else if (e.code === 'Space') {
+          e.preventDefault();
+          toggleRun();
+        } else if (k === 'r') {
+          restartMatch(true);
+        }
+      });
+
+      let lastTs = performance.now();
+      function loop(now) {
+        const rawDt = Math.min(0.05, (now - lastTs) / 1000);
+        lastTs = now;
+        game.update(rawDt);
+        game.render();
+        MatchRecorder.checkAutoStop();
+        requestAnimationFrame(loop);
+      }
+
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
