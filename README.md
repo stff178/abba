@@ -11,6 +11,10 @@ A zero-dependency, 60 FPS **2D Physics Anime Ball Battle Simulator** built with 
 
 ## Features
 
+- **Alternating Turns:** Every 1.5 seconds of active combat, one fighter attacks while the other runs and dodges. Old attacks stop at the turn boundary. Final-form cinematics pause the turn clock; a transformed defender uses its ultimate on its next attacking turn.
+- **Larger Fighters and Clearer Hits:** Fighters are 1.5× their original size, and cast animations and projectiles run at 0.85× speed. Every fighter and form has a hurt expression, recoil and impact art for regular hits as well as skills. Layered impacts and louder critical hits sit above a very quiet continuous battle bed. All audio is synthesized locally, follows SFX mute, and is included in recordings.
+- **Cinematic Finish:** The final strike plays at 0.4× speed for one second, returns to normal speed, then the defeated portrait dissolves into glowing fragments over 1.5 seconds. The camera pans to the winner with a layered victory chord and stereo echoes. Only the winner title and name appear, with no statistics box. Auto-record preserves the complete ending.
+- **Compact Arena Layout:** The square sits directly below the HP, status and skill area. The comment prompt follows just below the arena.
 - **Portable Engine:** No build step, no bundler, no external libraries. Open the local HTML file in Chrome/Edge or OBS and keep the `src/` folder beside it.
 - **Seeded Physics:** The seed controls the initial movement, combat variance, critical hits and dodge rolls.
 - **Automatic Skill Rotation:** Fighters alternate between tactical, melee and ultimate casts. Each form has a different ultimate. Later forms use wider effects, stronger impacts and arena changes.
@@ -18,7 +22,7 @@ A zero-dependency, 60 FPS **2D Physics Anime Ball Battle Simulator** built with 
 - **Square Arena:** Fighters and ricochets bounce off four straight walls. Fighters separate after exchanging hits and can sidestep incoming lunges or projectiles. When both fighters fall below 50 HP, their colors light up the floor and edges.
 - **Fighter Forms:** All 28 fighters have five forms, unlocked at 80, 60, 40 and 20 HP. Portraits, cast patterns and abilities evolve with each form. Two final arena effects can be active together. On the final form, a one-second camera move pauses combat and leads directly into the ultimate. The match timer continues toward the configured finish.
 - **Multi-Layered Visual Identity:** Supports custom **PNG/WebP Avatar URLs** or built-in recognizable Canvas vector portraits, glowing neon auras, pill-shaped HP badges on each orb, and under-HUD manga skill callouts that never block the arena view.
-- **Built-In 1080p Full HD Video Recorder (`60 FPS`, `12 Mbps`):** Toggle **`Auto-Rec 1080p`** to automatically record directly from the `1080×1920` Canvas + procedural SFX audio from `Start` until the K.O. results card finishes — zero UI clutter in the exported video.
+- **Built-In 1080p Full HD Video Recorder (`60 FPS`, `12 Mbps`):** Toggle **`Auto-Rec 1080p`** to automatically record directly from the `1080×1920` Canvas + procedural SFX audio from `Start` through the slow final strike, disintegration, winner camera, victory sound and title — zero UI clutter in the exported video.
 - **Built-In Procedural Web Audio SFX:** Crisp synthesized wall bounces, hits, crits, blocks, slashes, and explosions with zero copyright risk and continuous audio keep-alive for clean recording.
 - **Creator Studio Panel:** Searchable character pickers, `Random Match`, `New Seed`, match duration and winner controls, and one-click **`Hide UI` / `Show UI`** (`H`).
 

@@ -83,6 +83,7 @@ const MatchDamage = (() => {
       let landed = false;
       for (const defender of arena.fighters) {
         const attacker = arena.fighters[1 - defender.side];
+        if (!arena.canAttack(attacker)) continue;
         if (closing || (plan.pending[defender.side] && defender.motion.dodge <= .11 && attacker.motion.dodge <= .11)) {
           landed = pace(arena, attacker, defender, arena.elapsed, false) || landed;
           plan.pending[defender.side] = false;
@@ -96,14 +97,15 @@ const MatchDamage = (() => {
     }
 
     if (closing) {
-      steer(left, right, dt, true);
-      steer(right, left, dt, true);
+      const attacker = arena.fighters[arena.turn.side];
+      steer(attacker, arena.fighters[1 - attacker.side], dt, true);
       return;
     }
     let pursued = null;
     let biggestGap = 0;
     for (const defender of arena.fighters) {
       const attacker = arena.fighters[1 - defender.side];
+      if (!arena.canAttack(attacker)) continue;
       if (!plan.pending[defender.side] || attacker.motion.dodge > 0 || attacker.movement.reset > 0) continue;
       const gap = defender.currentHp - targetHp(arena, defender, arena.elapsed);
       if (gap <= biggestGap) continue;
@@ -113,9 +115,6 @@ const MatchDamage = (() => {
     if (pursued) {
       const attacker = arena.fighters[1 - pursued.side];
       steer(attacker, pursued, dt, false);
-      if (arena.matchDuration <= 6 && plan.pending[attacker.side] && pursued.motion.dodge <= .11) {
-        steer(pursued, attacker, dt, false);
-      }
     }
   }
 

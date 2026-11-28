@@ -55,8 +55,8 @@ const ArenaBounds = (() => {
     const normal = (nx, ny) => {
       const projection = dx * nx + dy * ny;
       const gap = Math.hypot(projection, Math.sqrt(target * target - distance * distance)) - projection;
-      return { nx, ny, gap, aSpace: clearance(arena, a, -nx, -ny, a.radius),
-        bSpace: clearance(arena, b, nx, ny, b.radius) };
+      return { nx, ny, gap, aSpace: clearance(arena, a, -nx, -ny, a.boundaryRadius ?? a.radius),
+        bSpace: clearance(arena, b, nx, ny, b.boundaryRadius ?? b.radius) };
     };
     let best = normal(Math.cos(angle), Math.sin(angle));
     if (best.aSpace + best.bSpace >= best.gap) return best;

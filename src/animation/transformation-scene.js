@@ -37,6 +37,7 @@ const TransformationScene = (() => {
       }
       const length = Math.min(duration, Math.max(.18, available - .14));
       scene.active = { fighter, age: 0, length };
+      arena.playTransformationSound();
       arena.ultCinematic.active = false;
     }
 
@@ -172,7 +173,8 @@ const TransformationScene = (() => {
     const progress = current.age / current.length;
     const opacity = smooth(progress * 9) * (1 - smooth((progress - .8) / .2));
     const color = FighterForms.color(current.fighter);
-    const y = arena.centerY - 334 - Math.max(0, current.fighter.radius - 68) * 2.7;
+    const y = Math.max(arena.centerY - arena.arenaHalfSize + 65,
+      arena.centerY - 334 - Math.max(0, current.fighter.radius - 68) * 2.7);
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.textAlign = 'center';

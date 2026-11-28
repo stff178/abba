@@ -284,5 +284,30 @@ const FighterPortraits = (() => {
     return true;
   }
 
-  return { draw };
+  function drawHit(ctx, id, x, y, radius, style) {
+    if (style.pose !== 'hit') return;
+    const armored = ['ironman', 'ultron', 'war_machine', 'black_panther', 'spider_man', 'deadpool'].includes(id);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(radius, radius);
+    ctx.globalAlpha *= style.hurt ?? 1;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (armored) {
+      shape(ctx, 'M-.53 -.40 L-.31 -.29 L-.45 -.10 L-.27 .02 M.36 .16 L.56 .25 L.40 .40', null, '#fff0c0', .045);
+      shape(ctx, 'M-.56 .30 L-.38 .27 M.34 -.37 L.55 -.31', null, '#252339', .075);
+    } else {
+      oval(ctx, -.43, .24, .15, .08, 'rgba(167,94,144,.52)');
+      oval(ctx, .43, .24, .15, .08, 'rgba(167,94,144,.52)');
+      shape(ctx, 'M-.55 .16 L-.48 .27 M-.43 .13 L-.36 .25 M.35 .15 L.42 .27 M.47 .13 L.54 .24', null, '#9c5c77', .026);
+    }
+    if (!(id === 'gojo' && style.form === 0)) {
+      shape(ctx, 'M-.49 -.03 L-.31 .045 L-.14 -.055 M.14 -.055 L.31 .045 L.49 -.03', null, '#211d30', .064);
+    }
+    shape(ctx, 'M-.19 .39 Q0 .31 .19 .39 L.15 .49 L-.15 .49Z', '#fff1d5', '#352239', .035);
+    shape(ctx, 'M0 .37 L0 .47', null, '#6c5362', .022);
+    ctx.restore();
+  }
+
+  return { draw, drawHit };
 })();

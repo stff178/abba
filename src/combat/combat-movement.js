@@ -29,7 +29,7 @@ const CombatMovement = (() => {
     for (const turn of turns) {
       const vx = Math.cos(angle + turn);
       const vy = Math.sin(angle + turn);
-      const room = ArenaBounds.clearance(arena, fighter, vx, vy, fighter.radius + 7);
+      const room = ArenaBounds.clearance(arena, fighter, vx, vy, fighter.boundaryRadius + 7);
       const separation = vx * Math.cos(away) + vy * Math.sin(away);
       const score = Math.min(room, range) + separation * (dodge ? 29 : 46) - Math.abs(turn) * 5;
       if (!best || score > best.score) best = { vx, vy, score };
@@ -116,6 +116,14 @@ const CombatMovement = (() => {
       const crowdLimit = committed ? .43 : .18;
       if (state.crowd > crowdLimit && !state.reset && !fighter.motion.dodge) {
         reset(arena, fighter, enemy, .29, 550);
+      }
+      if (!arena.canAttack(fighter) && !state.reset && !fighter.motion.hit) {
+        const away = approachDirection(fighter, enemy);
+        const escape = heading(arena, fighter, enemy, away, 185, false);
+        const blend = Math.min(1, dt * 6);
+        const speed = fighter.char.speed * .9;
+        fighter.vx += (escape.vx * speed - fighter.vx) * blend;
+        fighter.vy += (escape.vy * speed - fighter.vy) * blend;
       }
     }
   }
