@@ -458,6 +458,7 @@
   <script src="src/combat/transformations.js"></script>
   <script src="src/animation/fighter-animator.js"></script>
   <script src="src/animation/transformation-scene.js"></script>
+  <script src="src/animation/finisher-scene.js"></script>
   <script src="src/combat/combat-movement.js"></script>
   <script src="src/combat/match-damage.js"></script>
   <script src="src/skills/ultimate-moves.js"></script>
@@ -478,9 +479,10 @@
       const CANVAS_W = 1080;
       const CANVAS_H = 1920;
       const ARENA_CX = CANVAS_W / 2;
-      const ARENA_CY = 1095;
+      const ARENA_CY = 905;
       const ARENA_HALF_SIZE = 450;
       const DEFAULT_DURATION = 60;
+      const FIGHTER_SCALE = 1.5;
 
       function formatClock(seconds) {
         const total = Math.round(seconds * 10);
@@ -531,6 +533,9 @@
         dest: null,
         masterBus: null,
         keepAliveOsc: null,
+        battleBus: null,
+        battleSource: null,
+        battlePlaying: false,
 
         ensure() {
           if (!this.ctx) {
@@ -540,8 +545,15 @@
               this.dest = this.ctx.createMediaStreamDestination();
               this.masterBus = this.ctx.createGain();
               this.masterBus.gain.value = 1.0;
-              this.masterBus.connect(this.ctx.destination);
-              this.masterBus.connect(this.dest);
+              const limiter = this.ctx.createDynamicsCompressor();
+              limiter.threshold.value = -8;
+              limiter.knee.value = 12;
+              limiter.ratio.value = 5;
+              limiter.attack.value = .003;
+              limiter.release.value = .18;
+              this.masterBus.connect(limiter);
+              limiter.connect(this.ctx.destination);
+              limiter.connect(this.dest);
 
               // Luồng âm thanh giữ nhịp siêu nhỏ (không nghe thấy) để Chrome MediaRecorder
               // không bao giờ bị ngắt hoặc lệch timestamp audio giữa các khoảng lặng SFX!
@@ -564,10 +576,70 @@
           return this.dest ? this.dest.stream.getAudioTracks() : [];
         },
 
-        tone({ freq = 220, endFreq = 70, dur = 0.12, type = 'triangle', gain = 0.16 }) {
+        syncBattle(playing) {
+          const active = Boolean(playing && this.enabled);
+          if (active === this.battlePlaying && this.audioEnabled === this.enabled) return;
+          this.audioEnabled = this.enabled;
+          if (this.masterBus) this.masterBus.gain.setTargetAtTime(this.enabled ? 1 : 0, this.ctx.currentTime, .025);
+          this.battlePlaying = active;
+          if (!active) {
+            if (this.battleBus) this.battleBus.gain.setTargetAtTime(0, this.ctx.currentTime, .10);
+            return;
+          }
+          const ac = this.ensure();
+          if (!ac) { this.battlePlaying = false; return; }
+          if (!this.battleSource) {
+            const buffer = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+              const t = i / ac.sampleRate;
+              const beat = t % .25;
+              const thud = Math.sin(2 * Math.PI * (72 * beat - 38 * beat * beat)) * Math.exp(-beat * 38);
+              const swish = (Math.random() * 2 - 1) * (.025 + .24 * Math.exp(-((t + .09) % .4) * 24));
+              data[i] = thud * .5 + swish;
+            }
+            this.battleSource = ac.createBufferSource();
+            this.battleSource.buffer = buffer;
+            this.battleSource.loop = true;
+            const filter = ac.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 1100;
+            this.battleBus = ac.createGain();
+            this.battleBus.gain.value = 0;
+            this.battleSource.connect(filter);
+            filter.connect(this.battleBus);
+            this.battleBus.connect(this.masterBus);
+            this.battleSource.start();
+          }
+          this.battleBus.gain.setTargetAtTime(.007, ac.currentTime, .18);
+        },
+
+        noise({ dur = .10, gain = .12, freq = 1500 } = {}) {
+          const ac = this.ensure();
+          if (!ac) return;
+          const buffer = ac.createBuffer(1, Math.ceil(ac.sampleRate * dur), ac.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+          const source = ac.createBufferSource();
+          source.buffer = buffer;
+          const filter = ac.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = freq;
+          filter.Q.value = .7;
+          const envelope = ac.createGain();
+          envelope.gain.setValueAtTime(gain, ac.currentTime);
+          envelope.gain.exponentialRampToValueAtTime(.001, ac.currentTime + dur);
+          source.connect(filter);
+          filter.connect(envelope);
+          envelope.connect(this.masterBus);
+          source.start();
+          source.stop(ac.currentTime + dur);
+        },
+
+        tone({ freq = 220, endFreq = 70, dur = 0.12, type = 'triangle', gain = 0.16, delay = 0, pan = 0 }) {
           const ac = this.ensure();
           if (!ac || !this.masterBus) return;
-          const now = ac.currentTime;
+          const now = ac.currentTime + delay;
           const osc = ac.createOscillator();
           const g = ac.createGain();
           osc.type = type;
@@ -576,13 +648,23 @@
           g.gain.setValueAtTime(gain, now);
           g.gain.exponentialRampToValueAtTime(0.001, now + dur);
           osc.connect(g);
-          g.connect(this.masterBus);
+          const stereo = ac.createStereoPanner();
+          stereo.pan.value = pan;
+          g.connect(stereo);
+          stereo.connect(this.masterBus);
           osc.start(now);
           osc.stop(now + dur);
         },
 
         wall(spd = 1) { this.tone({ freq: 140 + spd * 80, endFreq: 60, dur: 0.08, type: 'sine', gain: 0.1 }); },
-        hit(crit = false) { this.tone({ freq: crit ? 430 : 240, endFreq: 65, dur: crit ? 0.17 : 0.11, type: crit ? 'sawtooth' : 'triangle', gain: crit ? 0.21 : 0.15 }); },
+        hit(crit = false) {
+          this.tone({ freq: crit ? 430 : 240, endFreq: 65, dur: crit ? .23 : .15, type: crit ? 'sawtooth' : 'triangle', gain: crit ? .38 : .24 });
+          this.tone({ freq: crit ? 100 : 85, endFreq: 34, dur: crit ? .24 : .17, type: 'sine', gain: crit ? .17 : .11 });
+          this.noise({ dur: crit ? .14 : .09, gain: crit ? .19 : .12, freq: crit ? 2100 : 1450 });
+          if (crit) this.tone({ freq: 1150, endFreq: 280, dur: .15, type: 'triangle', gain: .13 });
+        },
+        miss() { this.tone({ freq: 760, endFreq: 160, dur: .18, type: 'sine', gain: .11 }); },
+        cast() { this.tone({ freq: 330, endFreq: 950, dur: .16, type: 'triangle', gain: .09 }); },
         block() { this.tone({ freq: 920, endFreq: 1440, dur: 0.16, type: 'sine', gain: 0.16 }); },
         bluePull() { this.tone({ freq: 320, endFreq: 110, dur: 0.32, type: 'sine', gain: 0.15 }); },
         redBlast() { this.tone({ freq: 520, endFreq: 55, dur: 0.3, type: 'sawtooth', gain: 0.24 }); },
@@ -591,9 +673,29 @@
           this.tone({ freq: 140, endFreq: 34, dur: 0.55, type: 'sawtooth', gain: 0.28 });
           this.tone({ freq: 520, endFreq: 180, dur: 0.45, type: 'triangle', gain: 0.16 });
         },
+        transform() {
+          this.tone({ freq: 65, endFreq: 260, dur: 1, type: 'sawtooth', gain: .20 });
+          for (const [index, freq] of [330, 440, 660, 880].entries()) {
+            this.tone({ freq, endFreq: freq * 1.5, dur: .28, delay: index * .20, type: 'sine', gain: .11 });
+          }
+          this.tone({ freq: 1100, endFreq: 220, dur: .4, delay: .6, type: 'triangle', gain: .16 });
+        },
         ko() {
           this.tone({ freq: 150, endFreq: 24, dur: 0.85, type: 'sawtooth', gain: 0.32 });
-          this.tone({ freq: 360, endFreq: 42, dur: 0.6, type: 'square', gain: 0.14 });
+          this.noise({ dur: .85, gain: .18, freq: 2200 });
+          this.tone({ freq: 1350, endFreq: 180, dur: 1.2, type: 'sine', gain: .10, delay: .12, pan: -.35 });
+          this.tone({ freq: 960, endFreq: 120, dur: 1.1, type: 'triangle', gain: .07, delay: .3, pan: .45 });
+        },
+        victory() {
+          this.tone({ freq: 65, endFreq: 49, dur: 1.9, type: 'sine', gain: .18 });
+          for (const [index, freq] of [262, 330, 392, 523].entries()) {
+            const delay = index * .12;
+            this.tone({ freq, endFreq: freq, dur: 1.15, delay, type: 'triangle', gain: .105, pan: (index % 2 ? 1 : -1) * .28 });
+            for (const echo of [1, 2, 3]) {
+              this.tone({ freq, endFreq: freq, dur: .85, delay: delay + echo * .21,
+                type: 'sine', gain: .055 / echo, pan: (echo % 2 ? 1 : -1) * .65 });
+            }
+          }
         }
       };
 
@@ -614,7 +716,7 @@
           this.speed = config.speed || 455;
           this.critChance = config.critChance || 0.18;
           this.critMult = config.critMult || 1.5;
-          this.radius = config.radius || 62;
+          this.radius = (config.radius || 62) * FIGHTER_SCALE;
           this.skills = config.skills || {};
           this.drawFallbackAvatar = config.drawFallbackAvatar;
           this.drawCustomEffects = config.drawCustomEffects;
@@ -1920,6 +2022,11 @@
           }
         }
 
+        get boundaryRadius() {
+          // Keep hair and HP badges inside the walls; Hulk has a wider, shorter portrait.
+          return this.radius * (this.char.id === 'hulk' ? 1.4 : 1.65);
+        }
+
         addBleedStack(source, dps, duration, maxStacks = 3) {
           if (this.bleedStacks.length >= maxStacks) {
             // Làm mới stack sắp hết hạn nhất
@@ -1948,6 +2055,7 @@
         }
 
         reset() {
+          SoundFX.syncBattle(false);
           this.rng = createRNG(this.seed);
           this.elapsed = 0;
           this.time = 0;
@@ -1962,6 +2070,8 @@
           this.ultimateDomains = [null, null];
           this.transformation = TransformationScene.create();
           this.matchDamage = MatchDamage.create(this.matchDuration);
+          this.turn = { index: 0, side: 0, age: 0, duration: 1.5 };
+          this.lastMissSoundAt = -1;
 
           // Active skill entities & FX pools
           this.particles = [];
@@ -1998,15 +2108,53 @@
         }
 
         playCastSound(cast) {
+          if (cast.slot === 'ultimate') return;
+          SoundFX.cast();
           if (cast.contact) {
             if (['claws', 'sword', 'odm', 'baton', 'hammer'].includes(cast.action)) SoundFX.slash();
-          } else if (cast.slot === 'ultimate') SoundFX.redBlast();
+          }
+        }
+
+        playMissSound(cast) {
+          if (cast?.landed || cast?.missSoundPlayed) return;
+          if (cast) cast.missSoundPlayed = true;
+          if (this.time - this.lastMissSoundAt < .12) return;
+          this.lastMissSoundAt = this.time;
+          SoundFX.miss();
+        }
+
+        canAttack(fighter) {
+          return !this.running || fighter.side === this.turn.side;
+        }
+
+        advanceTurn(dt) {
+          this.turn.age += dt;
+          if (this.turn.age + 1e-9 < this.turn.duration) return;
+          const outgoing = this.fighters[this.turn.side];
+          SkillTimeline.cancel(this, outgoing);
+          outgoing.contactBeat = null;
+          this.projectiles = this.projectiles.filter(shot => shot.owner !== outgoing);
+          this.blueVortices = this.blueVortices.filter(field => field.owner !== outgoing);
+          if (this.domainEffect?.owner === outgoing) this.domainEffect = null;
+          this.turn.age %= this.turn.duration;
+          if (this.turn.age > this.turn.duration - 1e-8) this.turn.age = 0;
+          this.turn.index++;
+          this.turn.side = 1 - this.turn.side;
+          this.fighters[this.turn.side].nextCastAt = this.elapsed + .08;
         }
 
         triggerUltimateCinematic(caster, text, color) {
           SoundFX.ultimate();
           caster.ultScale = 1.24;
           this.ultCinematic = { active: true, timer: 0, duration: 0.45, text, color };
+        }
+
+        playTransformationSound() {
+          SoundFX.transform();
+        }
+
+        playVictorySound() {
+          SoundFX.victory();
         }
 
         spawnParticles(x, y, color, count = 16, maxSpeed = 400) {
@@ -2073,10 +2221,12 @@
 
         // --- Main Simulation Update ---
         update(elapsedDt) {
-          const rawDt = Math.min(.05, elapsedDt);
-          if (this.koState) this.koState.realTimer += elapsedDt;
+          const timeScale = this.koState ? FinisherScene.frame(this).timeScale : 1;
+          const rawDt = Math.min(.05, elapsedDt) * timeScale;
+          if (this.koState) FinisherScene.advance(this, elapsedDt);
 
           const playing = this.running && !this.koState;
+          SoundFX.syncBattle(playing);
           const remaining = this.matchDuration - this.elapsed;
           const endsNow = playing && remaining - elapsedDt < 1e-9;
           const activeDt = playing ? Math.min(rawDt, Math.max(0, remaining)) : 0;
@@ -2128,6 +2278,7 @@
           }
 
           if (!this.koState) {
+            this.advanceTurn(dt);
             for (let i = 0; i < 2; i++) {
               const f = this.fighters[i];
               const enemy = this.fighters[1 - i];
@@ -2182,13 +2333,13 @@
           CombatMovement.advance(this, dt);
 
           // 3. Cập nhật Hố Đen Thương (Gojo Skill 1 - Blue)
-          this.updateBlueVortices(dt);
+          this.updateBlueVortices(dt * SkillTimeline.speed);
 
           // 4. Cập nhật Lãnh Địa Phục Ma Ngự Thai Tử (Sukuna Ultimate)
-          this.updateDomainEffect(dt);
+          this.updateDomainEffect(dt * SkillTimeline.speed);
 
           // 5. Cập nhật Đạn / Chưởng (Dismantle & Hollow Purple)
-          this.updateProjectiles(dt);
+          this.updateProjectiles(dt * SkillTimeline.speed);
 
           // Integrate movement and collisions in three physics steps.
           this.collisionCooldown = Math.max(0, this.collisionCooldown - dt);
@@ -2211,7 +2362,7 @@
               f.x += f.vx * subDt;
               f.y += f.vy * subDt;
 
-              const wallHit = ArenaBounds.reflect(this, f, f.radius);
+              const wallHit = ArenaBounds.reflect(this, f, f.boundaryRadius);
               if (wallHit) this.handleWallBounce(f, this.fighters[1 - i], wallHit);
             }
 
@@ -2413,13 +2564,14 @@
           this.collisionCooldown = .24;
           const cx = (a.x + b.x) / 2;
           const cy = (a.y + b.y) / 2;
-          this.processExchange(a, b, cx, cy, nx, ny);
-          this.processExchange(b, a, cx, cy, -nx, -ny);
+          if (this.canAttack(a)) this.processExchange(a, b, cx, cy, nx, ny);
+          if (this.canAttack(b)) this.processExchange(b, a, cx, cy, -nx, -ny);
           if (!a.skillCast?.contact) CombatMovement.reset(this, a, b, .23, 560);
           if (!b.skillCast?.contact) CombatMovement.reset(this, b, a, .23, 560);
         }
 
         processExchange(attacker, defender, cx, cy, nx, ny, useSkill = false) {
+          if (!this.canAttack(attacker)) return { blocked: true, amount: 0 };
           const variance = 0.9 + this.rng() * 0.2;
           const debuffMult = attacker.damageDebuffTimer > 0 ? 0.72 : 1.0;
           let rawDmg = attacker.char.attack * debuffMult * variance;
@@ -2439,6 +2591,8 @@
 
           const finalDisplayDmg = fmtDmg(hitInfo.damage);
           const dmgRes = this.applyDamage(attacker, defender, hitInfo.damage, {
+            skill: useSkill ? attacker.skillCast : null,
+            attack: useSkill ? attacker.skillCast : null,
             isDot: false,
             isCrit: hitInfo.isCrit,
             color: hitInfo.redSlam ? '#ff2a55' : hitInfo.isCrit ? '#ffd60a' : '#ffffff',
@@ -2466,6 +2620,9 @@
 
         applyDamage(attacker, defender, baseAmount, opts) {
           if (this.koState) return { blocked: true, amount: 0 };
+          if (attacker && !opts.isFinisher && !opts.isDot && !opts.isReflect && !this.canAttack(attacker)) {
+            return { blocked: true, amount: 0 };
+          }
 
           const formDamage = opts.isDot || opts.isReflect ? 1 : FighterForms.damageMultiplier(attacker);
           const matchScale = Math.min(1, DEFAULT_DURATION / this.matchDuration);
@@ -2479,17 +2636,26 @@
           if (natural) {
             if (defender.guardTimer > 0 && !opts.isDot) dmgInfo.amount *= .68;
             defender.char.skills.passive?.(defender, attacker, this, 'onTakeDamage', dmgInfo);
-            if (dmgInfo.blocked) return { ...dmgInfo, amount: 0 };
+            if (dmgInfo.blocked) {
+              if (!opts.isDot) this.playMissSound(opts.skill || opts.attack);
+              return { ...dmgInfo, amount: 0 };
+            }
             if (!opts.isDot && !opts.isReflect &&
                 (CombatMovement.avoids(defender, attacker, opts.attack) || FighterForms.dodge(this, defender, attacker))) {
+              this.playMissSound(opts.skill || opts.attack);
               return { ...dmgInfo, blocked: true, amount: 0 };
             }
           }
           dmgInfo.amount = MatchDamage.amount(this, defender, dmgInfo.amount, opts);
           if (dmgInfo.amount <= 0) return { ...dmgInfo, blocked: true };
           defender.currentHp -= dmgInfo.amount;
-          if (opts.skill && !opts.isDot && !opts.isReflect) SkillInk.impact(this, attacker, defender, opts.skill, opts);
           if (!opts.isDot) {
+            const cast = opts.skill || opts.attack || {
+              technique: opts.isCrit || opts.isFinisher ? 'stomp' : 'punch',
+              power: opts.isCrit || opts.isFinisher ? 2 : 0, form: attacker?.formStage || 0
+            };
+            cast.landed = true;
+            SkillInk.impact(this, attacker, defender, cast, opts);
             defender.hitFlash = 1.0;
             defender.motion.hit = .18;
           }
@@ -2523,16 +2689,30 @@
           TransformationScene.clear(this);
           this.floatingTexts.length = 0;
           const { winner, loser } = MatchDamage.resolve(this);
+          this.floatingTexts.length = 0;
+          this.particles.length = 0;
+          this.rings.length = 0;
+          this.slashes.length = 0;
           loser.displayHp = loser.trailHp = loser.currentHp;
-          this.koState = { winner, loser, realTimer: 0 };
+          this.koState = FinisherScene.create(winner, loser, this.rng);
           for (const fighter of this.fighters) {
             fighter.skillCast = null;
             fighter.activeSkillCallout = null;
+            fighter.trail.length = 0;
+            fighter.vx = fighter.vy = 0;
+            fighter.motion.dodge = 0;
+            fighter.motion.hit = fighter.motion.transform = 0;
+            fighter.skillReaction = null;
+            fighter.hitFlash = fighter.guardTimer = 0;
+            fighter.bleedStacks.length = 0;
+            fighter.movement.evade = null;
           }
           this.ultCinematic.active = false;
           this.skillPopups.length = 0;
           this.projectiles.length = 0;
           this.blueVortices.length = 0;
+          this.domainEffect = null;
+          SoundFX.syncBattle(false);
           SoundFX.ko();
           this.addShake(24);
           this.triggerFlash(FighterForms.color(winner), .31);
@@ -2597,7 +2777,8 @@
           ctx.fillStyle = '#0a0a10';
           ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
           ctx.save();
-          TransformationScene.applyCamera(ctx, this);
+          if (this.koState) FinisherScene.applyCamera(ctx, this);
+          else TransformationScene.applyCamera(ctx, this);
 
           if (this.shakeIntensity > 0.2) {
             ctx.translate((Math.random() - 0.5) * this.shakeIntensity * 2, (Math.random() - 0.5) * this.shakeIntensity * 2);
@@ -2654,10 +2835,11 @@
 
           // Vẽ 2 quả bóng nhân vật đa tầng
           for (const f of this.fighters) {
-            if (f.currentHp <= 0 && this.koState && this.koState.realTimer > 0.35) continue;
+            if (this.koState && f === this.koState.loser) continue;
             CombatMovement.draw(ctx, f);
             this.drawFighter(f);
           }
+          if (this.koState) FinisherScene.drawWorld(ctx, this);
 
           ctx.save();
           ArenaBounds.trace(ctx, this, -6);
@@ -2765,9 +2947,11 @@
             ctx.restore();
           }
 
-          this.drawTopHUD();
-          this.drawBottomHUD();
-          TransformationScene.drawTitle(ctx, this, CANVAS_W);
+          if (!this.koState) {
+            this.drawTopHUD();
+            this.drawBottomHUD();
+            TransformationScene.drawTitle(ctx, this, CANVAS_W);
+          }
 
           if (this.flash.alpha > 0.01) {
             ctx.save();
@@ -2824,6 +3008,10 @@
         }
 
         drawAvatarAt(character, x, y, r, style) {
+          this.drawAvatarOn(ctx, character, x, y, r, style);
+        }
+
+        drawAvatarOn(ctx, character, x, y, r, style) {
           if (character.avatarLoaded && character.avatarImg) {
             ctx.save();
             ctx.beginPath();
@@ -2838,12 +3026,14 @@
           } else if (!FighterPortraits.draw(ctx, character.id, x, y, r, style)) {
             character.drawFallbackAvatar?.(ctx, x, y, r, style.form >= 3);
           }
+          FighterPortraits.drawHit(ctx, character.id, x, y, r, style);
         }
 
         drawFighter(f) {
           const before = f.formBefore;
           const r = before?.radius || f.radius;
           const style = FighterAnimator.pose(f, this.time, this.running, f.currentHp <= 0);
+          if (this.koState) style.opacity *= FinisherScene.frame(this).winnerOpacity;
           if (before) {
             style.form = before.stage;
             style.color = before.color;
@@ -2934,6 +3124,7 @@
           const pillH = r * 0.52;
           const pillX = f.x - pillW / 2;
           const pillY = f.y + r * 1.17 - pillH / 2;
+          ctx.globalAlpha = style.opacity;
 
           ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
           ctx.shadowBlur = 10;
@@ -3228,78 +3419,18 @@
         }
 
         drawBottomHUD() {
+          if (this.koState) return;
           ctx.save();
           ctx.textAlign = 'center';
           ctx.font = `700 28px 'Segoe UI', sans-serif`;
           ctx.fillStyle = 'rgba(255, 255, 255, 0.56)';
-          ctx.fillText('Comment the next battle! Top comment wins 👇', ARENA_CX, 1805);
+          ctx.fillText('Comment the next battle! Top comment wins 👇', ARENA_CX, ARENA_CY + ARENA_HALF_SIZE + 70);
           ctx.restore();
         }
 
         // Bảng kết quả cuối trận hoàn toàn bằng TIẾNG ANH
         drawKOOverlay() {
-          const { winner, loser, realTimer } = this.koState;
-          const fade = Math.min(1, realTimer / 0.45);
-
-
-          ctx.save();
-          ctx.fillStyle = `rgba(5, 6, 11, ${fade * 0.65})`;
-          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-          const popScale = realTimer < 0.25 ? 1.85 - (realTimer / 0.25) * 0.85 : 1.0;
-          ctx.translate(ARENA_CX, 815);
-          ctx.scale(popScale, popScale);
-          ctx.font = `900 160px 'Segoe UI', Impact, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.shadowColor = winner.char.color;
-          ctx.shadowBlur = 45;
-          ctx.lineWidth = 14;
-          ctx.strokeStyle = '#07070c';
-          ctx.strokeText('K.O!', 0, 0);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText('K.O!', 0, 0);
-          ctx.restore();
-
-          {
-            const cardFade = Math.min(1, .82 + realTimer * .6);
-            ctx.save();
-            ctx.globalAlpha = cardFade;
-
-            ctx.font = `900 68px 'Segoe UI', Impact, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.shadowColor = winner.char.color;
-            ctx.shadowBlur = 30;
-            ctx.fillStyle = winner.char.color;
-            ctx.fillText(`${winner.char.name} WINS!`, ARENA_CX, 955, 960);
-            ctx.shadowBlur = 0;
-
-            const boxW = 680;
-            const boxH = 235;
-            const boxX = ARENA_CX - boxW / 2;
-            const boxY = 1015;
-
-            ctx.fillStyle = 'rgba(16, 18, 28, 0.94)';
-            ctx.strokeStyle = winner.char.color;
-            ctx.lineWidth = 4;
-            this.roundRect(ctx, boxX, boxY, boxW, boxH, 24);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.font = `800 34px 'Segoe UI', sans-serif`;
-            ctx.fillStyle = '#f2f5ff';
-            ctx.fillText(`${winner.side === 0 ? 'LEFT' : 'RIGHT'}  •  ${Math.ceil(winner.currentHp)} / ${winner.maxHp} HP`, ARENA_CX, boxY + 70);
-            ctx.fillText(`Match Duration: ${this.elapsed.toFixed(1)}s`, ARENA_CX, boxY + 130);
-
-            ctx.fillStyle = '#9aa4c7';
-            ctx.font = `600 26px 'Segoe UI', sans-serif`;
-            ctx.fillText(
-              `Total Damage: ${Math.round(winner.totalDamageDealt)}  •  Hits Landed: ${winner.hitsLanded}`,
-              ARENA_CX,
-              boxY + 188
-            );
-
-            ctx.restore();
-          }
+          FinisherScene.drawOverlay(ctx, this, CANVAS_W, CANVAS_H);
         }
 
         roundRect(c, x, y, w, h, r) {
@@ -3539,8 +3670,8 @@
         },
 
         checkAutoStop() {
-          // Tự động dừng và xuất video sau khi hiện bảng kết quả K.O được ~2.2 giây
-          if (this.isRecording && game.koState && game.koState.realTimer >= 3.2) {
+          // Preserve the slow final hit, dissolve, camera pan, victory sound and winner title.
+          if (this.isRecording && game.koState && game.koState.realTimer >= FinisherScene.duration) {
             this.stop();
           }
         }
