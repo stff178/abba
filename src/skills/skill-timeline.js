@@ -1,6 +1,7 @@
 'use strict';
 
 const SkillTimeline = (() => {
+  const speed = .85;
   const rotation = ['skill1', 'skill2', 'skill1', 'ultimate'];
   const finalRotation = ['skill1', 'ultimate', 'skill2'];
   const timings = {
@@ -46,17 +47,29 @@ const SkillTimeline = (() => {
   }
 
   function advanceRotation(arena, fighter, target, dt) {
+    if (!arena.canAttack(fighter)) return;
+    if (fighter.pendingFinalUltimate && !fighter.formBefore) {
+      fighter.pendingFinalUltimate = false;
+      fireUltimate(arena, fighter, target);
+    }
     update(arena, fighter, dt);
-    if (fighter.skillCast || fighter.formBefore || fighter.motion.dodge > .10 || arena.elapsed < fighter.nextCastAt) return;
+    if (fighter.skillCast || fighter.formBefore || fighter.motion.dodge > .10 || arena.elapsed < fighter.nextCastAt ||
+        fighter.lastCastTurn === arena.turn.index) return;
     const sequence = fighter.formStage === 4 ? finalRotation : rotation;
     const slot = sequence[fighter.castIndex % sequence.length];
     fighter.castIndex++;
+    fighter.lastCastTurn = arena.turn.index;
     begin(fighter, target, slot, arena.intensity);
-    const delay = (1.65 - .72 * arena.intensity) * fighter.castIntervalMultiplier;
+    const delay = (1.65 - .72 * arena.intensity) * fighter.castIntervalMultiplier / speed;
     fighter.nextCastAt = arena.elapsed + delay;
   }
 
   function fireUltimate(arena, fighter, target) {
+    if (!arena.canAttack(fighter)) {
+      fighter.pendingFinalUltimate = true;
+      return;
+    }
+    fighter.lastCastTurn = arena.turn.index;
     begin(fighter, target, 'ultimate', arena.intensity);
     const cast = fighter.skillCast;
     cast.age = cast.charge;
@@ -167,6 +180,7 @@ const SkillTimeline = (() => {
     const cast = fighter.skillCast;
     if (!cast) return;
 
+    dt *= speed;
     const oldAge = cast.age;
     cast.age += dt;
     if (oldAge < cast.charge && cast.age >= cast.charge) release(arena, fighter, cast);
@@ -192,7 +206,13 @@ const SkillTimeline = (() => {
       }
     }
 
-    if (elapsed >= cast.active + cast.recovery) fighter.skillCast = null;
+    if (elapsed >= cast.active + cast.recovery) cancel(arena, fighter);
+  }
+
+  function cancel(arena, fighter) {
+    const cast = fighter.skillCast;
+    if (cast && cast.age >= cast.charge && !cast.landed) arena.playMissSound(cast);
+    fighter.skillCast = null;
   }
 
   function drawCharge(ctx, fighter, cast, arena) {
@@ -343,5 +363,5 @@ const SkillTimeline = (() => {
     ctx.restore();
   }
 
-  return { begin, update, advanceRotation, fireUltimate, drawBackground, draw };
+  return { speed, begin, update, cancel, advanceRotation, fireUltimate, drawBackground, draw };
 })();
