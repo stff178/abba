@@ -1,9 +1,10 @@
 'use strict';
 
 const ContactSkills = (() => {
-  const armed = new Set(['claws', 'sword', 'odm', 'baton', 'hammer']);
-  const hook = new Set(['odm', 'webKick']);
-  const heavy = new Set(['stomp', 'warHammer', 'hammer']);
+  const armed = new Set(['claws','sword','odm','baton','hammer','ironArms','hotClaws','nanoBlade',
+    'dualBlades','moonBlade','reverseBlade','daggers','dualHammer','stinger','cleave']);
+  const hook = new Set(['odm', 'webSwing']);
+  const heavy = new Set(['stomp', 'warHammer', 'hammer', 'dualHammer']);
 
   function heading(fighter, target) {
     return Math.atan2(target.y - fighter.y, target.x - fighter.x);
@@ -14,14 +15,14 @@ const ContactSkills = (() => {
     cast.hitFrames = [];
     if (hook.has(cast.technique)) {
       const bearing = heading({ x: arena.centerX, y: arena.centerY }, cast.target) + (fighter.side ? -.57 : .57);
-      cast.anchor = { x: arena.centerX + Math.cos(bearing) * (arena.arenaRadius - 6),
-        y: arena.centerY + Math.sin(bearing) * (arena.arenaRadius - 6) };
+      cast.anchor = ArenaBounds.wallAt(arena, bearing, 6);
     }
     fighter.motion.dash = .28;
   }
 
   function advance(arena, fighter, cast, progress, dt, strike) {
     const { target, technique, power, form } = cast;
+    if (cast.finishedContact || fighter.motion.dodge > .11 || fighter.movement.reset > .08) return;
     const dx = target.x - fighter.x;
     const dy = target.y - fighter.y;
     const distance = Math.hypot(dx, dy) || 1;
@@ -30,6 +31,8 @@ const ContactSkills = (() => {
     const slam = heavy.has(technique);
     const reach = fighter.radius + target.radius + (slam ? 35 + form * 10 : armed.has(technique) ? 36 : 17);
     const direction = heading(fighter, target);
+    const count = power === 2 && !slam ? (technique === 'baryon' ? 4 : form >= 2 ? 3 : 2) : 1;
+    if (technique === 'rasengan' || technique === 'webSwing') cast.handPoint = UltimateAnimator.origin(arena,fighter,cast);
     if (distance > reach * .90) {
       const speed = Math.min(1290, 320 + (distance - reach * .86) * 3.4) + (hook.has(technique) ? 170 : 0);
       const turn = Math.min(1, dt * 15);
@@ -37,23 +40,26 @@ const ContactSkills = (() => {
       fighter.vx += (Math.cos(bearing) * speed - fighter.vx) * turn;
       fighter.vy += (Math.sin(bearing) * speed - fighter.vy) * turn;
     } else {
-      const settle = Math.min(1, dt * 15);
-      fighter.vx += (ux * 160 - fighter.vx) * settle;
-      fighter.vy += (uy * 160 - fighter.vy) * settle;
+      const turn = Math.min(1, dt * 12);
+      const sweep = fighter.side ? -1 : 1;
+      fighter.vx += (-uy * sweep * 255 - fighter.vx) * turn;
+      fighter.vy += (ux * sweep * 255 - fighter.vy) * turn;
     }
 
-    const count = power === 2 && !slam ? (form >= 2 ? 3 : 2) : 1;
-    const hitAt = (slam ? .17 : .10) + cast.hits * .24;
-    if (distance > reach || cast.hits >= count || progress < hitAt || progress > .96) return;
+    const hitAt = (slam ? .17 : .10) + cast.hits * (technique === 'baryon' ? .19 : .24);
+    if (distance > reach || cast.hits >= count || progress < hitAt || progress > .96 ||
+        cast.age - cast.charge < (slam ? .12 : .078)) return;
+    if (CombatMovement.avoids(target, fighter, cast)) return;
     cast.hits++;
     cast.impactAge = cast.age;
     const point = { x: fighter.x + ux * Math.min(fighter.radius + 22, distance * .6),
       y: fighter.y + uy * Math.min(fighter.radius + 22, distance * .6) };
     cast.hitFrames.push({ ...point, start: cast.age, direction });
-    strike(count === 1 ? 1.12 : 1.25 / count);
+    strike(count === 1 ? 1.12 : 1.25 / count, point);
+    cast.finishedContact = cast.hits === count;
+    if (cast.finishedContact) CombatMovement.reset(arena, fighter, target, .31, 610);
     if (slam) {
-      arena.spawnRing(point.x, point.y, 16, 104 + form * 22, cast.color, .35);
-      arena.spawnParticles(point.x, point.y, cast.color, 13 + form * 3, 220 + form * 45);
+      arena.spawnParticles(point.x, point.y, cast.color, 6 + form, 185 + form * 30);
       arena.addShake(6 + form * 2);
     }
   }
@@ -70,15 +76,15 @@ const ContactSkills = (() => {
       ctx.strokeStyle = technique === 'odm' ? '#d9e4f1' : '#eef7ff';
       for (const lane of lanes) {
         ctx.beginPath();
-        ctx.moveTo(fighter.x - lane * 19 * Math.sin(angle), fighter.y + lane * 19 * Math.cos(angle));
+        const source = cast.handPoint || fighter;
+        ctx.moveTo(source.x - lane * 19 * Math.sin(angle), source.y + lane * 19 * Math.cos(angle));
         ctx.quadraticCurveTo((fighter.x + cast.anchor.x) * .5 + lane * 14,
           (fighter.y + cast.anchor.y) * .5 + lane * 25, cast.anchor.x + lane * 23, cast.anchor.y - lane * 9);
         ctx.stroke();
       }
     }
-    if (technique === 'rasengan' && cast.hits === 0) {
-      const x = fighter.x + Math.cos(angle) * fighter.radius * .82;
-      const y = fighter.y + Math.sin(angle) * fighter.radius * .82;
+    if (technique === 'rasengan' && cast.hits === 0 && cast.handPoint) {
+      const {x,y} = cast.handPoint;
       const radius = 12 + form * 4;
       ctx.globalAlpha = alpha * .89;
       ctx.fillStyle = '#8ee7ff';

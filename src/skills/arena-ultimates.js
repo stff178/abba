@@ -15,9 +15,9 @@ const ArenaUltimates = (() => {
   function webMesh(arena, source, strength) {
     const center = { x: arena.centerX, y: arena.centerY };
     const count = 14;
-    const radius = arena.arenaRadius * .98 * strength;
+    const spokes = Array.from({ length: count }, (_, i) => ArenaBounds.wallAt(arena, i * turn / count - .13, 9));
     const rings = [0.20, .37, .54, .72, .89, 1].map(scale =>
-      Array.from({ length: count }, (_, i) => vec(center, i * turn / count - .13, radius * scale))
+      spokes.map(edge => mix(center, edge, strength * scale))
     );
     const paths = rings.map(ring => [...ring, ring[0]]);
     for (let i = 0; i < count; i++) {
@@ -31,14 +31,14 @@ const ArenaUltimates = (() => {
     cast.spectacle = { hits: 0, paths: [], fists: [], titans: [], phase: 0 };
     if (cast.action !== 'webArena') return;
     const center = { x: arena.centerX, y: arena.centerY };
-    const wall = vec(center, angle(center, fighter) + (fighter.side ? -.42 : .42), arena.arenaRadius * .97);
+    const wall = ArenaBounds.wallAt(arena, angle(center, fighter) + (fighter.side ? -.42 : .42), 12);
     cast.anchor = wall;
   }
 
   function strike(arena, fighter, cast, progress, strikeTarget, canHit) {
     const scene = cast.spectacle;
     const nextBeat = scene.hits;
-    const giant = cast.action === 'dawnFists' && cast.technique === 'dawnFists';
+    const giant = cast.action === 'dawnFists' && cast.technique !== 'elasticFlurry';
     const beatCount = giant ? 1 : cast.action === 'dawnFists' ? 4 : 3;
     if (nextBeat === beatCount || progress < (giant ? .43 : .19 + nextBeat * .22)) return;
 
@@ -46,8 +46,7 @@ const ArenaUltimates = (() => {
     if (!canHit) return;
     strikeTarget(1 / (beatCount * .8));
     const target = cast.target;
-    arena.spawnRing(target.x, target.y, 24 + cast.form * 5, 120 + cast.form * 32, cast.color, .35);
-    arena.spawnParticles(target.x, target.y, cast.color, 12 + cast.form * 3, 350 + cast.form * 42);
+    arena.spawnParticles(target.x, target.y, cast.color, 5 + cast.form, 215 + cast.form * 25);
   }
 
   function advance(arena, fighter, cast, progress, dt, strikeTarget) {
@@ -60,7 +59,7 @@ const ArenaUltimates = (() => {
 
     if (action === 'webArena') {
       scene.paths = webMesh(arena, cast.origin, flow);
-      canHit = distance(center, target) <= arena.arenaRadius * flow + target.radius;
+      canHit = ArenaBounds.contains(arena, target, arena.arenaHalfSize * (1 - flow) - target.radius);
       if (canHit) {
         const pull = angle(target, center);
         target.vx += Math.cos(pull) * 610 * dt;
@@ -68,14 +67,14 @@ const ArenaUltimates = (() => {
         target.domainSlowTimer = Math.max(target.domainSlowTimer, .09);
       }
     } else if (action === 'dawnFists') {
-      const giant = cast.technique === 'dawnFists';
-      const dawn = form >= 3;
+      const giant = cast.technique !== 'elasticFlurry';
+      const dawn = form === 4;
       const direction = angle(fighter, target);
       const count = giant ? 1 : 4 + Number(form >= 3);
       const reach = giant ? 430 + form * 49 : 380 + form * 37;
       scene.fists = Array.from({ length: count }, (_, i) => {
         const lane = (i - (count - 1) * .5);
-        const shoulder = vec(fighter, direction + (lane > 0 ? 1.1 : -1.1), fighter.radius * .66);
+        const shoulder = UltimateAnimator.origin(arena, fighter, cast, lane > 0 ? 0 : 1);
         const phase = (progress * 3.75 + i / count) % 1;
         const punch = giant ? Math.min(1, progress * 2.45) * (1 - Math.max(0, progress - .64) / .40)
           : Math.sin(phase * Math.PI) ** .68;
@@ -90,10 +89,10 @@ const ArenaUltimates = (() => {
       const spacing = 125;
       scene.titans = Array.from({ length: count }, (_, i) => {
         const lane = i - (count - 1) * .5;
-        const base = vec(vec(center, dir, -arena.arenaRadius * .9 + flow * arena.arenaRadius * 1.06), dir + Math.PI / 2, lane * spacing);
+        const base = vec(vec(center, dir, -arena.arenaHalfSize * .9 + flow * arena.arenaHalfSize * 1.06), dir + Math.PI / 2, lane * spacing);
         return { ...base, stride: progress * 15 + i * .7, radius: 42 + form * 10 - Math.abs(lane) * 3 };
       });
-      scene.field = { ...center, reach: arena.arenaRadius * (.17 + .79 * flow) };
+      scene.field = { ...center, reach: arena.arenaHalfSize * (.17 + .79 * flow) };
       canHit = flow > .51 && distance(center, target) < scene.field.reach + target.radius;
     } else if (action === 'moonClaws') {
       const count = 3 + form;
@@ -112,14 +111,7 @@ const ArenaUltimates = (() => {
     strike(arena, fighter, cast, progress, strikeTarget, canHit);
   }
 
-  function lines(ctx, paths) {
-    ctx.beginPath();
-    for (const path of paths) {
-      ctx.moveTo(path[0].x, path[0].y);
-      for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    }
-    ctx.stroke();
-  }
+
 
   function paintFist(ctx, cast, fighter, fist, alpha) {
     const { shoulder, tip, angle, punch, dawn, lane, giant } = fist;
@@ -128,28 +120,30 @@ const ArenaUltimates = (() => {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = alpha * (.61 + punch * .39);
-    ctx.strokeStyle = dawn ? '#694167' : '#354933';
+    ctx.globalAlpha = alpha * (.70 + punch * .30);
+    const boundman = cast.form === 3;
+    ctx.strokeStyle = dawn ? '#412d55' : '#302033';
     ctx.lineWidth = size * 1.03;
     ctx.beginPath();
     ctx.moveTo(shoulder.x, shoulder.y);
     const bend = vec(mix(shoulder, tip, .50), angle + (lane >= 0 ? 1.57 : -1.57), dawn ? Math.min(100, reach * .23) : 21);
     ctx.quadraticCurveTo(bend.x, bend.y, tip.x, tip.y);
     ctx.stroke();
-    ctx.strokeStyle = dawn ? '#efe1ff' : '#8ccb68';
+    ctx.strokeStyle = dawn ? '#efe1ff' : boundman ? '#75344d' : '#d78c65';
     ctx.lineWidth *= .76;
     ctx.stroke();
-    ctx.strokeStyle = cast.color;
-    ctx.lineWidth *= .19;
+    ctx.strokeStyle = dawn ? '#fff8e4' : boundman ? '#f59587' : '#ffdda6';
+    ctx.lineWidth *= .13;
     ctx.stroke();
+    if (punch > .26) SkillInk.speed(ctx, tip, angle, size * 1.5, size * .53, '#fff4d6', .64, 5);
 
     ctx.translate(tip.x, tip.y);
     ctx.rotate(angle);
     ctx.scale(size, size);
     const glow = ctx.createLinearGradient(-.8, -.7, .9, .67);
-    glow.addColorStop(0, dawn ? '#fff4ec' : '#d6efa0');
-    glow.addColorStop(.58, dawn ? '#ecd1ff' : '#9bcd75');
-    glow.addColorStop(1, dawn ? '#a689d0' : '#587c54');
+    glow.addColorStop(0, dawn ? '#fff4ec' : boundman ? '#ec9582' : '#ffe0ad');
+    glow.addColorStop(.58, dawn ? '#ecd1ff' : boundman ? '#8d405c' : '#e0a178');
+    glow.addColorStop(1, dawn ? '#a689d0' : boundman ? '#3d233a' : '#8d4d59');
     ctx.beginPath();
     ctx.moveTo(-.74, -.42);
     ctx.quadraticCurveTo(-.52, -.86, -.13, -.71);
@@ -160,8 +154,8 @@ const ArenaUltimates = (() => {
     ctx.closePath();
     ctx.fillStyle = glow;
     ctx.fill();
-    ctx.strokeStyle = dawn ? '#5a3e65' : '#2b4438';
-    ctx.lineWidth = .10;
+    ctx.strokeStyle = dawn ? '#382748' : '#322232';
+    ctx.lineWidth = .13;
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(.035, -.60);
@@ -216,29 +210,32 @@ const ArenaUltimates = (() => {
 
   function drawField(ctx, cast, field, alpha) {
     const spread = field.reach;
-    const tint = ctx.createRadialGradient(field.x, field.y, 0, field.x, field.y, spread);
+    const color = cast.color;
+    const tint = ctx.createRadialGradient(field.x, field.y, 2, field.x, field.y, spread);
     tint.addColorStop(0, '#fff6df');
-    tint.addColorStop(.26, cast.color);
+    tint.addColorStop(.26, color);
     tint.addColorStop(1, 'transparent');
-    ctx.globalAlpha = alpha * .24;
+    ctx.globalAlpha = alpha * .21;
     ctx.fillStyle = tint;
     ctx.beginPath();
     ctx.arc(field.x, field.y, spread, 0, turn);
     ctx.fill();
-    for (let i = 0; i < 6; i++) {
-      const phase = cast.spectacle.phase * 8 * (i % 2 ? 1 : -1) + i;
-      ctx.strokeStyle = i % 3 === 0 ? '#fff7ef' : cast.color;
-      ctx.globalAlpha = alpha * (.58 - i * .061);
-      ctx.lineWidth = i % 3 === 0 ? 5 : 2.6;
+    const phase = cast.spectacle.phase;
+    ctx.globalAlpha = alpha * .74;
+    for (let i = 0; i < 4; i++) {
+      const start = phase * (i % 2 ? 6 : -4) + i * 1.61;
+      const radius = spread * (.73 + i * .076);
       ctx.beginPath();
-      ctx.arc(field.x, field.y, spread * (1 - i * .12), phase, phase + turn * .78);
-      ctx.stroke();
+      ctx.arc(field.x, field.y, radius, start, start + 1.05 + i * .29);
+      SkillInk.traced(ctx, color, i % 2 ? 4.2 : 5.6);
     }
+    ctx.globalAlpha = 1;
   }
 
   function draw(ctx, fighter, cast, alpha, background = false) {
     const state = cast.spectacle;
-    const behind = cast.action === 'webArena' || cast.action === 'titanMarch' || cast.action === 'nova';
+    const connected = cast.action === 'dawnFists' && cast.lastContact && cast.age - cast.lastContact.age < .34;
+    const behind = connected || cast.action === 'webArena' || cast.action === 'titanMarch' || cast.action === 'nova';
     if (!state || alpha < .01 || behind !== background) return;
     ctx.save();
     ctx.lineCap = 'round';
@@ -246,16 +243,10 @@ const ArenaUltimates = (() => {
     if (state.field?.reach > 0) drawField(ctx, cast, state.field, alpha);
     if (state.paths.length) {
       const web = cast.action === 'webArena';
-      ctx.globalAlpha = alpha * .32;
-      ctx.strokeStyle = cast.color;
-      ctx.lineWidth = web ? 10 : 25;
-      lines(ctx, state.paths);
-      ctx.globalAlpha = alpha * .83;
-      ctx.strokeStyle = '#fff9ed';
-      ctx.lineWidth = web ? 1.8 : 4.4;
-      lines(ctx, state.paths);
+      if (web) SkillInk.line(ctx, state.paths, '#c7e9ff', 4.3, alpha * .69, '#ffffff');
+      else for (const path of state.paths) SkillInk.ribbon(ctx, path, 12 + cast.form * 2, cast.color, alpha * .89);
     }
-    for (const titan of state.titans) paintTitan(ctx, titan, cast.color, alpha * .75);
+    for (const titan of state.titans) paintTitan(ctx, titan, cast.color, alpha * .86);
     for (const fist of state.fists) paintFist(ctx, cast, fighter, fist, alpha);
     ctx.restore();
   }

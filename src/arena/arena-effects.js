@@ -24,7 +24,7 @@ const ArenaEffects = (() => {
 
   function addFinalForm(arena, fighter, profile) {
     arena.finalFormStages[fighter.side] = { theme: profile.theme, color: FighterForms.color(fighter), start: arena.time };
-    arena.spawnRing(fighter.x, fighter.y, 40, arena.arenaRadius * .82, FighterForms.color(fighter), .78);
+    arena.spawnRing(fighter.x, fighter.y, 40, arena.arenaHalfSize * .82, FighterForms.color(fighter), .78);
   }
 
   function castUltimate(arena, fighter, cast) {
@@ -36,8 +36,7 @@ const ArenaEffects = (() => {
       length: cast.active + .72 + cast.form * .16, strength, anchor: { x: fighter.x, y: fighter.y }
     };
     if (cast.form >= 2) {
-      arena.spawnRing(fighter.x, fighter.y, 38, arena.arenaRadius * (.76 + strength * .2), cast.color, .63);
-      arena.triggerFlash(cast.color, .10 + strength * .09);
+      arena.triggerFlash(cast.color, .055 + strength * .057);
     }
   }
 
@@ -148,9 +147,9 @@ const ArenaEffects = (() => {
       ctx.lineWidth = 2.1;
       ctx.globalAlpha = alpha * .32 * power;
       for (let j = 0; j < 4; j++) {
-        const spin = time * side * (.32 + j * .06) + i * Math.PI + j * .82;
-        ctx.beginPath();
-        ctx.arc(x, y, radius * (.26 + j * .17), spin, spin + 1.4);
+        const start = time * side * (.21 + j * .04) + i * 2 + j * .52;
+        const inset = radius * (.74 - j * .17);
+        ArenaBounds.traceEdge(ctx, arena, inset, start, .88);
         ctx.stroke();
       }
 
@@ -169,34 +168,35 @@ const ArenaEffects = (() => {
     ctx.restore();
   }
 
-  function drawClashRim(ctx, arena, x, y) {
-    const radius = arena.arenaRadius;
+  function drawClashRim(ctx, arena) {
     ctx.save();
     ctx.lineCap = 'round';
     for (const [i, fighter] of arena.fighters.entries()) {
       const color = FighterForms.color(fighter);
-      const start = arena.time * (.23 + arena.intensity * .23) + i * Math.PI;
+      const start = arena.time * (.16 + arena.intensity * .22) + i * 2;
       ctx.globalAlpha = arena.clashAge * .82;
       ctx.strokeStyle = color;
       ctx.shadowColor = color;
       ctx.shadowBlur = 22;
       ctx.lineWidth = 7 + arena.intensity * 3;
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 1, start, start + Math.PI * .82);
+      ArenaBounds.traceEdge(ctx, arena, 0, start, 1.63);
       ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.globalAlpha *= .59;
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let j = 0; j < 14; j++) {
-        const a = start + j * .205;
-        ctx.moveTo(x + Math.cos(a) * (radius - 20), y + Math.sin(a) * (radius - 20));
-        ctx.lineTo(x + Math.cos(a + .015) * (radius - 10), y + Math.sin(a + .015) * (radius - 10));
+        const position = start + j * .115;
+        const inner = ArenaBounds.lane(arena, 23, position);
+        const outer = ArenaBounds.lane(arena, 11, position + .008);
+        ctx.moveTo(inner.x, inner.y);
+        ctx.lineTo(outer.x, outer.y);
       }
       ctx.stroke();
     }
     ctx.restore();
   }
+
 
   function polar(x, y, radius, angle) {
     return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius];
@@ -213,7 +213,7 @@ const ArenaEffects = (() => {
 
   function drawMotif(ctx, stage, arena, x, y, index) {
     const [kind, spokes, layers, speed] = motifs[stage.theme];
-    const radius = arena.arenaRadius - 12;
+    const radius = arena.arenaHalfSize - 12;
     const age = arena.time - stage.start;
     const blend = Math.min(1, age * 2.1) * (stage.strength ?? 1);
     const rotation = arena.time * speed + index * Math.PI;
@@ -290,7 +290,7 @@ const ArenaEffects = (() => {
     const phase = age / domain.length;
     if (phase < 0 || phase >= 1) return;
     const power = domain.strength * Math.min(1, phase * 13) * Math.min(1, (1 - phase) * 4.4);
-    const radius = arena.arenaRadius;
+    const radius = arena.arenaHalfSize;
     const [kind, spokes] = motifs[domain.theme];
     const direction = side ? -1 : 1;
     const color = domain.color;
@@ -300,13 +300,13 @@ const ArenaEffects = (() => {
     hue.addColorStop(.68, color);
     hue.addColorStop(1, 'transparent');
     ctx.fillStyle = hue;
-    ctx.globalAlpha = power * .21;
+    ctx.globalAlpha = power * .13;
     ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 
     const spread = radius * Math.min(.97, phase * 3.65 + .16);
     const rotation = phase * turn * .42 * direction + side * Math.PI;
-    ctx.globalAlpha = power * .72;
-    ctx.lineWidth = 2.3 + power * 3;
+    ctx.globalAlpha = power * .48;
+    ctx.lineWidth = 2.3 + power * 2.15;
     ctx.strokeStyle = color;
     ctx.beginPath();
     const count = Math.max(6, Math.min(14, spokes));
@@ -316,7 +316,8 @@ const ArenaEffects = (() => {
         ctx.moveTo(...polar(x, y, spread * .18, angle + .17));
         ctx.lineTo(...polar(x, y, spread * .55, angle - .08));
         ctx.lineTo(...polar(x, y, spread * .63, angle + .05));
-        ctx.lineTo(...polar(x, y, spread, angle - .07));
+        const edge = ArenaBounds.wallAt(arena, angle - .07, radius - spread);
+        ctx.lineTo(edge.x, edge.y);
       }
     } else if (kind === 'grid') {
       for (let i = 0; i < 5; i++) {
@@ -338,25 +339,23 @@ const ArenaEffects = (() => {
     }
     ctx.stroke();
 
-    ctx.globalAlpha = power * .61;
+    ctx.globalAlpha = power * .37;
     ctx.strokeStyle = '#fff7eb';
     ctx.lineWidth = 1.6 + power * 2.1;
-    ctx.beginPath();
     const opening = Math.min(.88, phase * 1.2 + .31);
-    ctx.arc(x, y, spread, rotation, rotation + turn * opening);
+    ArenaBounds.traceEdge(ctx, arena, radius - spread, rotation * 4 / turn, 4 * opening);
     ctx.stroke();
     ctx.restore();
   }
 
   function drawFloor(ctx, arena, x, y) {
-    const radius = arena.arenaRadius;
+    const radius = arena.arenaHalfSize;
     const scene = get(arena);
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, turn);
+    ArenaBounds.trace(ctx, arena);
     ctx.clip();
 
-    const ground = ctx.createRadialGradient(x, y - radius * .35, 8, x, y, radius);
+    const ground = ctx.createRadialGradient(x, y - radius * .25, 8, x, y, radius * 1.46);
     ground.addColorStop(0, '#182030');
     ground.addColorStop(1, '#0c111b');
     ctx.fillStyle = ground;
@@ -372,6 +371,26 @@ const ArenaEffects = (() => {
     }
     ctx.stroke();
 
+    ctx.strokeStyle = 'rgba(147,188,221,.24)';
+    ctx.lineWidth = 2;
+    ArenaBounds.trace(ctx, arena, 27);
+    ctx.stroke();
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        const px = x + sx * (radius - 16);
+        const py = y + sy * (radius - 16);
+        ctx.strokeStyle = 'rgba(157,230,245,.63)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(px - sx * 61, py);
+        ctx.lineTo(px, py);
+        ctx.lineTo(px, py - sy * 61);
+        ctx.stroke();
+        ctx.fillStyle = '#4d798f';
+        ctx.fillRect(px - sx * 33 - 2, py - sy * 33 - 2, 4, 4);
+      }
+    }
+
     if (scene) {
       ctx.globalAlpha = scene.alpha;
       drawDomain(ctx, x, y, radius, scene, arena.time);
@@ -385,8 +404,8 @@ const ArenaEffects = (() => {
     ctx.restore();
   }
 
-  function drawRim(ctx, arena, x, y, baseColor) {
-    if (arena.clashAge > 0) drawClashRim(ctx, arena, x, y);
+  function drawRim(ctx, arena, baseColor) {
+    if (arena.clashAge > 0) drawClashRim(ctx, arena);
     for (const [index, stage] of arena.finalFormStages.entries()) {
       if (!stage) continue;
       ctx.save();
@@ -395,9 +414,8 @@ const ArenaEffects = (() => {
       ctx.lineWidth = 4;
       ctx.setLineDash([14, 8, 2, 11]);
       ctx.lineDashOffset = arena.time * (index ? 60 : -60);
-      const start = index === 0 ? Math.PI / 2 : -Math.PI / 2;
-      ctx.beginPath();
-      ctx.arc(x, y, arena.arenaRadius - 8, start, start + Math.PI);
+      const start = index === 0 ? 2.5 : .5;
+      ArenaBounds.traceEdge(ctx, arena, 8, start, 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -411,8 +429,7 @@ const ArenaEffects = (() => {
     ctx.shadowBlur = 23;
     ctx.setLineDash(scene.kind === 'cosmic' ? [34, 11, 4, 11] : [19, 8]);
     ctx.lineDashOffset = -arena.time * 32;
-    ctx.beginPath();
-    ctx.arc(x, y, arena.arenaRadius - 3, 0, turn);
+    ArenaBounds.trace(ctx, arena, 3);
     ctx.stroke();
     ctx.restore();
   }

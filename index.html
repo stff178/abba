@@ -451,16 +451,21 @@
   <script src="src/characters/fighter-roster.js"></script>
   <script src="src/characters/marvel-portraits.js"></script>
   <script src="src/characters/final-portraits.js"></script>
+  <script src="src/characters/form-portraits.js"></script>
   <script src="src/characters/portraits.js"></script>
+  <script src="src/arena/arena-bounds.js"></script>
   <script src="src/arena/arena-effects.js"></script>
   <script src="src/combat/transformations.js"></script>
   <script src="src/animation/fighter-animator.js"></script>
   <script src="src/animation/transformation-scene.js"></script>
+  <script src="src/combat/combat-movement.js"></script>
   <script src="src/combat/match-damage.js"></script>
   <script src="src/skills/ultimate-moves.js"></script>
+  <script src="src/skills/skill-ink.js"></script>
   <script src="src/animation/ultimate-animator.js"></script>
   <script src="src/skills/contact-skills.js"></script>
   <script src="src/skills/arena-ultimates.js"></script>
+  <script src="src/skills/comic-skills.js"></script>
   <script src="src/skills/signature-skills.js"></script>
   <script src="src/skills/skill-timeline.js"></script>
   <script>
@@ -474,7 +479,7 @@
       const CANVAS_H = 1920;
       const ARENA_CX = CANVAS_W / 2;
       const ARENA_CY = 1095;
-      const ARENA_RADIUS = 450;
+      const ARENA_HALF_SIZE = 450;
       const DEFAULT_DURATION = 60;
 
       function formatClock(seconds) {
@@ -1890,6 +1895,8 @@
           this.isAwakened = false;
           this.skillCast = null;
           this.motion = FighterAnimator.create();
+          this.skillReaction = null;
+          this.movement = CombatMovement.create();
           this.hitFlash = 0;       // White flash 0.1s khi dính đòn
           this.ultScale = 1.0;
 
@@ -1944,7 +1951,7 @@
           this.rng = createRNG(this.seed);
           this.elapsed = 0;
           this.time = 0;
-          this.arenaRadius = ARENA_RADIUS;
+          this.arenaHalfSize = ARENA_HALF_SIZE;
           this.centerX = ARENA_CX;
           this.centerY = ARENA_CY;
           this.clashAge = 0;
@@ -1960,6 +1967,7 @@
           this.particles = [];
           this.floatingTexts = [];
           this.skillPopups = [];
+          this.skillHits = [];
           this.rings = [];
           this.slashes = [];
           this.projectiles = [];
@@ -1991,7 +1999,7 @@
 
         playCastSound(cast) {
           if (cast.contact) {
-            if (['claws', 'sword', 'odm', 'baton', 'hammer'].includes(cast.technique)) SoundFX.slash();
+            if (['claws', 'sword', 'odm', 'baton', 'hammer'].includes(cast.action)) SoundFX.slash();
           } else if (cast.slot === 'ultimate') SoundFX.redBlast();
         }
 
@@ -2081,6 +2089,9 @@
           }
 
           this.time += rawDt;
+          if (this.skillHits.length && this.time - this.skillHits[0].start >= this.skillHits[0].duration) {
+            this.skillHits = this.skillHits.filter(hit => this.time - hit.start < hit.duration);
+          }
           const cinematic = playing && !endsNow && TransformationScene.advance(this, Math.min(elapsedDt, remaining));
           const dt = cinematic ? 0 : activeDt - stoppedTime;
           MatchDamage.prune(this);
@@ -2168,6 +2179,8 @@
             }
           }
 
+          CombatMovement.advance(this, dt);
+
           // 3. Cập nhật Hố Đen Thương (Gojo Skill 1 - Blue)
           this.updateBlueVortices(dt);
 
@@ -2185,7 +2198,6 @@
           for (let s = 0; s < subSteps; s++) {
             for (let i = 0; i < 2; i++) {
               const f = this.fighters[i];
-              const enemy = this.fighters[1 - i];
 
               const curSpeed = Math.hypot(f.vx, f.vy) || 1;
               const formSpeed = FighterForms.speedMultiplier(f);
@@ -2199,62 +2211,8 @@
               f.x += f.vx * subDt;
               f.y += f.vy * subDt;
 
-              // Va chạm thành đấu trường hình tròn
-              const dx = f.x - ARENA_CX;
-              const dy = f.y - ARENA_CY;
-              const dist = Math.hypot(dx, dy);
-              const maxDist = this.arenaRadius - f.radius;
-
-              if (dist > maxDist && dist > 0.0001) {
-                const nx = dx / dist;
-                const ny = dy / dist;
-                f.x = ARENA_CX + nx * maxDist;
-                f.y = ARENA_CY + ny * maxDist;
-
-                const dot = f.vx * nx + f.vy * ny;
-                if (dot > 0) {
-                  f.vx -= 2 * dot * nx;
-                  f.vy -= 2 * dot * ny;
-
-                  const jitter = (this.rng() - 0.5) * 0.16;
-                  const cJ = Math.cos(jitter);
-                  const sJ = Math.sin(jitter);
-                  const nvx = f.vx * cJ - f.vy * sJ;
-                  const nvy = f.vx * sJ + f.vy * cJ;
-                  f.vx = nvx;
-                  f.vy = nvy;
-                  f.motion.wall = .19;
-
-                  if (!this.koState) {
-                    SoundFX.wall(1);
-                    if (f.char.skills.passive) {
-                      f.char.skills.passive(f, enemy, this, 'onWallBounce');
-                    }
-                    this.spawnParticles(
-                      ARENA_CX + nx * this.arenaRadius,
-                      ARENA_CY + ny * this.arenaRadius,
-                      f.char.color,
-                      8,
-                      240
-                    );
-
-                    // Nếu đang bị hất văng bởi Gojo Red -> Chịu thêm sát thương đập tường!
-                    if (f.redSlamArmed) {
-                      f.redSlamArmed = false;
-                      this.addShake(18);
-                      this.spawnParticles(f.x, f.y, '#ff1e56', 26, 460);
-                      this.applyDamage(f.redSlamSource, f, 4.2, {
-                        isCrit: true,
-                        color: '#ff3864',
-                        label: `-${fmtDmg(4.2)} WALL SLAM!`,
-                        size: 34
-                      });
-                    }
-
-
-                  }
-                }
-              }
+              const wallHit = ArenaBounds.reflect(this, f, f.radius);
+              if (wallHit) this.handleWallBounce(f, this.fighters[1 - i], wallHit);
             }
 
             this.resolveBallCollision();
@@ -2316,11 +2274,10 @@
           if (dom.slashAccum >= 0.03) {
             dom.slashAccum = 0;
             for (let k = 0; k < 3; k++) {
-              const ang = Math.random() * Math.PI * 2;
-              const rad = Math.random() * (this.arenaRadius - 20);
+              const span = this.arenaHalfSize - 20;
               this.spawnSlash(
-                ARENA_CX + Math.cos(ang) * rad,
-                ARENA_CY + Math.sin(ang) * rad,
+                ARENA_CX + (Math.random() * 2 - 1) * span,
+                ARENA_CY + (Math.random() * 2 - 1) * span,
                 Math.random() < 0.75 ? '#ff003c' : '#ffffff',
                 90 + Math.random() * 140
               );
@@ -2362,7 +2319,7 @@
               this.spawnParticles(p.x, p.y, p.color, 3, 220);
             }
 
-            if (!p.hit && !this.koState) {
+            if (!p.hit && !this.koState && !CombatMovement.avoids(p.target, p.owner, p)) {
               const d = Math.hypot(p.x - p.target.x, p.y - p.target.y);
               if (d < p.radius + p.target.radius) {
                 p.hit = true;
@@ -2380,6 +2337,7 @@
                 const dmgRes = this.applyDamage(p.owner, p.target, p.damage, {
                   isCrit: isBigUlt || p.type === 'thunder_spear',
                   isRanged: true,
+                  attack: p,
                   color: p.color,
                   label: tag ? `-${shown} ${tag}` : `-${shown}`,
                   size: isBigUlt ? 44 : 30,
@@ -2415,45 +2373,50 @@
           }
         }
 
+        handleWallBounce(fighter, opponent, wallHit) {
+          fighter.motion.wall = .19;
+          SoundFX.wall(1);
+          fighter.char.skills.passive?.(fighter, opponent, this, 'onWallBounce');
+          this.spawnParticles(wallHit.x, wallHit.y, fighter.char.color, 8, 240);
+          if (!fighter.redSlamArmed) return;
+          fighter.redSlamArmed = false;
+          this.addShake(18);
+          this.spawnParticles(fighter.x, fighter.y, '#ff1e56', 26, 460);
+          this.applyDamage(fighter.redSlamSource, fighter, 4.2, {
+            isCrit: true, color: '#ff3864', label: '-' + fmtDmg(4.2) + ' WALL SLAM!', size: 34
+          });
+        }
+
         resolveBallCollision() {
-          const a = this.fighters[0];
-          const b = this.fighters[1];
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.hypot(dx, dy);
-          const minDist = a.radius + b.radius;
+          const [a, b] = this.fighters;
+          const separation = ArenaBounds.separation(this, a, b);
+          if (!separation) return;
+          const { nx, ny, gap, aSpace, bSpace } = separation;
+          const aShare = b.mass / (a.mass + b.mass);
+          const aStep = Math.min(aSpace, Math.max(gap * aShare, gap - bSpace));
+          const bStep = Math.min(bSpace, gap - aStep);
+          a.x -= nx * aStep;
+          a.y -= ny * aStep;
+          b.x += nx * bStep;
+          b.y += ny * bStep;
 
-          if (dist < minDist && dist > 0.0001) {
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const overlap = minDist - dist + 1;
-            const aShare = b.mass / (a.mass + b.mass);
-            const bShare = 1 - aShare;
-            a.x -= nx * overlap * aShare;
-            a.y -= ny * overlap * aShare;
-            b.x += nx * overlap * bShare;
-            b.y += ny * overlap * bShare;
-
-            const relativeSpeed = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-            if (relativeSpeed < 0) {
-              const impulse = -2 * relativeSpeed;
-              a.vx -= impulse * nx * aShare;
-              a.vy -= impulse * ny * aShare;
-              b.vx += impulse * nx * bShare;
-              b.vy += impulse * ny * bShare;
-            }
-
-            if (this.collisionCooldown <= 0 && !this.koState) {
-              this.collisionCooldown = 0.22;
-              const cx = (a.x + b.x) / 2;
-              const cy = (a.y + b.y) / 2;
-
-              this.processExchange(a, b, cx, cy, nx, ny);
-              if (!this.koState) {
-                this.processExchange(b, a, cx, cy, -nx, -ny);
-              }
-            }
+          const speed = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          if (speed < 475) {
+            const impulse = 475 - speed;
+            a.vx -= impulse * nx * aShare;
+            a.vy -= impulse * ny * aShare;
+            b.vx += impulse * nx * (1 - aShare);
+            b.vy += impulse * ny * (1 - aShare);
           }
+          if (speed >= -30 || this.collisionCooldown > 0 || this.koState) return;
+
+          this.collisionCooldown = .24;
+          const cx = (a.x + b.x) / 2;
+          const cy = (a.y + b.y) / 2;
+          this.processExchange(a, b, cx, cy, nx, ny);
+          this.processExchange(b, a, cx, cy, -nx, -ny);
+          if (!a.skillCast?.contact) CombatMovement.reset(this, a, b, .23, 560);
+          if (!b.skillCast?.contact) CombatMovement.reset(this, b, a, .23, 560);
         }
 
         processExchange(attacker, defender, cx, cy, nx, ny, useSkill = false) {
@@ -2517,13 +2480,15 @@
             if (defender.guardTimer > 0 && !opts.isDot) dmgInfo.amount *= .68;
             defender.char.skills.passive?.(defender, attacker, this, 'onTakeDamage', dmgInfo);
             if (dmgInfo.blocked) return { ...dmgInfo, amount: 0 };
-            if (!opts.isDot && !opts.isReflect && FighterForms.dodge(this, defender)) {
+            if (!opts.isDot && !opts.isReflect &&
+                (CombatMovement.avoids(defender, attacker, opts.attack) || FighterForms.dodge(this, defender, attacker))) {
               return { ...dmgInfo, blocked: true, amount: 0 };
             }
           }
           dmgInfo.amount = MatchDamage.amount(this, defender, dmgInfo.amount, opts);
           if (dmgInfo.amount <= 0) return { ...dmgInfo, blocked: true };
           defender.currentHp -= dmgInfo.amount;
+          if (opts.skill && !opts.isDot && !opts.isReflect) SkillInk.impact(this, attacker, defender, opts.skill, opts);
           if (!opts.isDot) {
             defender.hitFlash = 1.0;
             defender.motion.hit = .18;
@@ -2543,7 +2508,10 @@
           if (!opts.isDot) {
             SoundFX.hit(opts.isCrit);
             this.addShake(opts.isFinisher ? 18 : opts.isPaced ? 3 : opts.isCrit ? 14 : 6);
-            this.spawnParticles(fx, fy, opts.isCrit ? '#ffd60a' : (attacker?.char.color || opts.color), opts.isFinisher ? 28 : opts.isPaced ? 6 : opts.isCrit ? 22 : 12, opts.isPaced ? 185 : 420);
+            const count = opts.skill ? (opts.skill.power === 2 ? 8 : 5) : opts.isFinisher ? 28 : opts.isPaced ? 6 : opts.isCrit ? 22 : 12;
+            const speed = opts.skill ? 230 : opts.isPaced ? 185 : 420;
+            this.spawnParticles(opts.point?.x ?? fx, opts.point?.y ?? fy,
+              opts.skill ? opts.color : opts.isCrit ? '#ffd60a' : (attacker?.char.color || opts.color), count, speed);
           }
 
           return dmgInfo;
@@ -2636,7 +2604,7 @@
           }
 
           this.drawBackground();
-          this.drawArenaRing();
+          this.drawArena();
 
           // Hố đen Thương (Gojo Blue)
           for (const v of this.blueVortices) {
@@ -2672,14 +2640,13 @@
           // Màn hình tối dần 0.4s khi tung Ultimate (trước khi vẽ nhân vật để nhân vật nổi bật)
           if (this.ultCinematic.active) {
             const p = this.ultCinematic.timer / this.ultCinematic.duration;
-            const dim = p < 0.2 ? (p / 0.2) * .27 : (1 - (p - 0.2) / 0.8) * .27;
+            const dim = p < 0.2 ? (p / 0.2) * .40 : (1 - (p - 0.2) / 0.8) * .40;
             ctx.fillStyle = `rgba(4, 4, 10, ${Math.max(0, dim)})`;
             ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
           }
 
           ctx.save();
-          ctx.beginPath();
-          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius + 6, 0, Math.PI * 2);
+          ArenaBounds.trace(ctx, this, -6);
           ctx.clip();
           for (const fighter of this.fighters) SkillTimeline.drawBackground(ctx, fighter);
           ctx.restore();
@@ -2688,15 +2655,15 @@
           // Vẽ 2 quả bóng nhân vật đa tầng
           for (const f of this.fighters) {
             if (f.currentHp <= 0 && this.koState && this.koState.realTimer > 0.35) continue;
+            CombatMovement.draw(ctx, f);
             this.drawFighter(f);
           }
 
           ctx.save();
-          ctx.beginPath();
-          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius + 6, 0, Math.PI * 2);
+          ArenaBounds.trace(ctx, this, -6);
           ctx.clip();
-          for (const fighter of this.fighters) SkillTimeline.draw(ctx, fighter);
           MatchDamage.draw(ctx, this);
+          for (const fighter of this.fighters) SkillTimeline.draw(ctx, fighter, this);
           ctx.restore();
 
           this.drawProjectiles();
@@ -2731,6 +2698,8 @@
             ctx.fill();
             ctx.restore();
           }
+
+          SkillInk.drawImpacts(ctx, this);
 
           // Số sát thương nhảy
           for (const t of this.floatingTexts) {
@@ -2833,7 +2802,7 @@
           ctx.stroke();
         }
 
-        drawArenaRing() {
+        drawArena() {
           ctx.save();
           ArenaEffects.drawFloor(ctx, this, ARENA_CX, ARENA_CY);
 
@@ -2842,18 +2811,16 @@
           ctx.lineWidth = 9;
           ctx.shadowColor = ringColor;
           ctx.shadowBlur = 28 + Math.sin(this.time * 7) * 8;
-          ctx.beginPath();
-          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
+          ArenaBounds.trace(ctx, this);
           ctx.stroke();
 
           ctx.shadowBlur = 0;
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
           ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
+          ArenaBounds.trace(ctx, this);
           ctx.stroke();
           ctx.restore();
-          ArenaEffects.drawRim(ctx, this, ARENA_CX, ARENA_CY, ringColor);
+          ArenaEffects.drawRim(ctx, this, ringColor);
         }
 
         drawAvatarAt(character, x, y, r, style) {
@@ -2891,9 +2858,9 @@
 
           FighterAnimator.drawTrail(ctx, f, accent, (x, y) => this.drawAvatarAt(f.char, x, y, r * .9, style));
 
-          const auraSize = r * (1.24 + style.form * .12);
+          const auraSize = r * (1.22 + style.form * .10);
           ctx.save();
-          ctx.globalAlpha = style.opacity * (.29 + style.form * .13);
+          ctx.globalAlpha = style.opacity * (.20 + style.form * .065) * (f.skillCast ? .57 : 1);
           const aura = ctx.createRadialGradient(f.x, f.y, r * .56, f.x, f.y, auraSize);
           aura.addColorStop(0, accent);
           aura.addColorStop(1, 'transparent');
@@ -2923,8 +2890,8 @@
           ctx.scale(style.sx, style.sy);
           if (style.form > 0) {
             ctx.strokeStyle = accent;
-            ctx.globalAlpha *= .56;
-            ctx.lineWidth = 2.5 + style.form;
+            ctx.globalAlpha *= f.skillCast ? .24 : .46;
+            ctx.lineWidth = 2.2 + style.form * .58;
             const arcStart = this.time * (f.side ? -2.2 : 2.2);
             ctx.beginPath();
             ctx.arc(0, 0, r * 1.13, arcStart, arcStart + Math.PI * .78);
@@ -2966,7 +2933,7 @@
           const pillW = r * 1.16;
           const pillH = r * 0.52;
           const pillX = f.x - pillW / 2;
-          const pillY = f.y + r * (rig ? 2.05 * shrink : 1.15) - pillH / 2;
+          const pillY = f.y + r * 1.17 - pillH / 2;
 
           ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
           ctx.shadowBlur = 10;

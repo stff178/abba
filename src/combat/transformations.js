@@ -32,6 +32,7 @@ const FighterForms = (() => {
     fighter.formStage = stage;
     fighter.isAwakened = stage >= 3;
     fighter.radius = fighter.char.radius * (1 + (profile?.growth || 0) * stage);
+    if (fighter.radius > before.radius) Object.assign(fighter, ArenaBounds.confine(arena, fighter, fighter.radius));
     fighter.mass = 1 + (profile?.weight || 0) * stage;
     fighter.motion.transform = .52 + stage * .065;
     if (stage === 4 && profile) {
@@ -51,7 +52,7 @@ const FighterForms = (() => {
 
   }
 
-  function dodge(arena, fighter) {
+  function dodge(arena, fighter, attacker) {
     const style = FighterRoster.get(fighter.char.id)?.passive;
     const stage = fighter.formStage;
     if (fighter.motion.dodgeCooldown > 0) return false;
@@ -61,11 +62,8 @@ const FighterForms = (() => {
       : style === 'trickster' && stage >= 3 ? .12 : 0;
     if (!odds || arena.rng() >= odds) return false;
 
+    if (!CombatMovement.startDodge(arena, fighter, attacker)) return false;
     fighter.motion.dodgeCooldown = style === 'trickster' ? 2 : 2.5;
-    fighter.motion.dodge = .27;
-    fighter.speedBoostTimer = Math.max(fighter.speedBoostTimer, .26);
-    arena.spawnFloatingText(fighter.x, fighter.y - fighter.radius * 1.2, 'MISS', color(fighter), 29);
-    arena.spawnRing(fighter.x, fighter.y, fighter.radius * .6, fighter.radius * 1.4, color(fighter), .25);
     return true;
   }
 

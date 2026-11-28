@@ -45,14 +45,14 @@ const MarvelPortraits = (() => {
 
     const drawings = {
       spider_man(ctx, { form, pose, color }) {
-        const suit = ['#b72e4d', '#ca3f5b', '#923051', '#2b2846', '#744da7'][form];
-        const seam = form === 2 ? '#ffda85' : form >= 3 ? color : '#411e45';
+        const suit = ['#b72e4d', '#242538', '#923051', '#a83151', '#343c7a'][form];
+        const seam = form === 2 ? '#ffda85' : form >= 3 ? color : form === 1 ? '#41445d' : '#411e45';
         collar(ctx, '#22274e', form >= 2 ? '#5d4f92' : '#4a5796', dark);
-        if (form === 2 || form === 4) mirrored(ctx, () => shape(ctx,
+        if (form === 2) mirrored(ctx, () => shape(ctx,
           'M.43 .57 L.93 .095 L1.22 -.71 L1.49 -.84 L1.294 -.536 L1.235 .22 L.71 .735Z M.62 .56 L1.09 .564 L1.38 .278 L1.43 .384 L1.16 .711 L.59 .753Z',
           form === 2 ? '#c79553' : '#7773c7'));
         shape(ctx, shell, suit);
-        shape(ctx, 'M-.566 -.74 Q-.434 -1.014 -.08 -1.063 L-.256 -.886 L-.371 -.619Z', form >= 3 ? '#a17de1' : '#e87985', null);
+        shape(ctx, 'M-.566 -.74 Q-.434 -1.014 -.08 -1.063 L-.256 -.886 L-.371 -.619Z', form === 1 ? '#535269' : form >= 3 ? '#a17de1' : '#e87985', null);
         shape(ctx, 'M0 -1.076 L0 .64 M-.55 -.815 Q0 -.7 .55 -.815 M-.658 -.59 Q0 -.45 .658 -.59 M-.649 -.31 Q0 -.235 .649 -.31 M-.653 .021 Q0 -.088 .653 .021 M-.516 .339 Q0 .156 .516 .339 M-.382 .485 Q0 .392 .382 .485 M-.54 -.815 Q-.353 -.43 0 .045 Q.353 -.43 .54 -.815 M-.676 .28 L0 .045 L.676 .28', null, seam, .029);
         lids(ctx, pose, hawkLens, form === 4 ? '#ddfaff' : pale);
         if (form === 1) shape(ctx, 'M-.26 .504 L0 .659 L.26 .504', null, pale, .05);

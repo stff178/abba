@@ -27,11 +27,11 @@ const controls = inline.indexOf('      const game = new BattleArena();');
 assert.ok(controls > 0, 'Could not locate the boundary between the engine and browser controls');
 vm.runInContext(inline.slice(0, controls) + [
   'SoundFX.enabled = false;',
-  'Object.assign(globalThis, { BattleArena, CHARACTER_REGISTRY, FighterRoster, FighterForms, SkillTimeline, CharacterMoves, UltimateAnimator });',
+  'Object.assign(globalThis, { BattleArena, CHARACTER_REGISTRY, FighterRoster, FighterForms, SkillTimeline, CharacterMoves, UltimateAnimator, ComicSkills, ArenaBounds, CombatMovement, FighterAnimator });',
   '})();'
 ].join('\n'), context, { filename: 'index.html' });
 
-const { BattleArena, CHARACTER_REGISTRY: registry, FighterRoster, FighterForms, SkillTimeline, CharacterMoves, UltimateAnimator } = context;
+const { BattleArena, CHARACTER_REGISTRY: registry, FighterRoster, FighterForms, SkillTimeline, CharacterMoves, UltimateAnimator, ComicSkills, ArenaBounds, CombatMovement, FighterAnimator } = context;
 const ids = Object.keys(registry);
 assert.equal(ids.length, 28);
 assert.equal(new Set(Object.values(registry).map(fighter => fighter.name)).size, 28);
@@ -57,11 +57,13 @@ for (const id of ids) {
       SkillTimeline.begin(fighter, target, slot, .7);
       const cast = fighter.skillCast;
       assert.equal(cast.technique, CharacterMoves.get(id, stage, slot)?.technique, id + ' ' + stage + ' ' + slot);
-      if (id === 'hulk') assert.ok(cast.contact && ['punch', 'stomp', 'bodyRush', 'grapple'].includes(cast.action));
-      if (slot === 'ultimate') {
+      if (id === 'hulk') assert.ok(cast.technique === 'regeneration' ||
+        (cast.contact && ['punch', 'stomp', 'bodyRush', 'grapple', 'hammer'].includes(cast.action)));
+      {
         const rig = UltimateAnimator.pose(arena, fighter, fighter.radius);
-        assert.equal(rig.hands.length, 2, id + ' ultimate hands');
-        assert.equal(rig.feet.length, 2, id + ' ultimate feet');
+        assert.equal(rig.hands.length, id === 'sukuna' && stage >= 3 ? 4 : 2, id + ' hands');
+        assert.equal(rig.feet, undefined, id + ' hand-only animation');
+        assert.equal(rig.elbows.length, rig.hands.length);
         cast.age = cast.charge + .2;
         const released = UltimateAnimator.pose(arena, fighter, fighter.radius);
         assert.notDeepEqual(released.hands, rig.hands, id + ' ultimate release stance');
@@ -71,6 +73,7 @@ for (const id of ids) {
       else assert.equal(typeof fighter.char.skills[slot], 'function', id + ' ' + stage + ' ' + slot);
       SkillTimeline.update(arena, fighter, cast.charge + .015);
       assert.ok(Number.isFinite(fighter.x) && Number.isFinite(fighter.vx), id + ' cast state');
+      if (ComicSkills.handles(cast.technique)) assert.ok(cast.comic, id + ' comic effect');
     }
   }
 
@@ -79,7 +82,70 @@ for (const id of ids) {
   FighterForms.sync(arena, fighter);
   assert.equal(fighter.formStage, 4, id + ' forms remain unlocked on healing');
 }
-console.log('PASS: Verified 28 fighters, 140 forms and 420 cast configurations.');
+console.log('PASS: Verified 28 fighters, 140 forms and 420 hand-animated casts.');
+assert.equal(CharacterMoves.get('gojo', 4, 'ultimate').technique, 'void');
+assert.equal(CharacterMoves.get('sukuna', 1, 'ultimate').technique, 'divineFlame');
+assert.equal(CharacterMoves.get('sukuna', 2, 'ultimate').technique, 'tenShadows');
+assert.equal(CharacterMoves.get('naruto', 4, 'ultimate').contact, true);
+assert.equal(CharacterMoves.get('thanos', 4, 'ultimate').technique, 'snap');
+assert.equal(CharacterMoves.get('doraemon', 4, 'ultimate').technique, 'timeCloth');
+
+const square = new BattleArena();
+const [left, right] = square.fighters;
+const cornerX = square.centerX + square.arenaHalfSize;
+const cornerY = square.centerY - square.arenaHalfSize;
+const ricochet = { x: cornerX + 4, y: cornerY - 7, vx: 300, vy: -460 };
+const wall = ArenaBounds.reflect(square, ricochet);
+assert.equal(wall.x, cornerX);
+assert.equal(wall.y, cornerY);
+assert.equal(ricochet.vx, -300);
+assert.equal(ricochet.vy, 460);
+assert.ok(ArenaBounds.contains(square, { x: cornerX - 8, y: cornerY + 8 }));
+Object.assign(left, { x: cornerX - left.radius, y: cornerY + left.radius + 9, vx: 0, vy: 0 });
+Object.assign(right, { x: cornerX - right.radius - 12, y: cornerY + right.radius, vx: 0, vy: 0 });
+square.resolveBallCollision();
+assert.ok(Math.hypot(left.x - right.x, left.y - right.y) > left.radius + right.radius);
+assert.ok(square.fighters.every(fighter => ArenaBounds.contains(square, fighter, fighter.radius)));
+
+square.reset();
+square.running = true;
+const [shooter, dodger] = square.fighters;
+Object.assign(shooter, { x: square.centerX - 220, y: square.centerY, vx: 0, vy: 0 });
+Object.assign(dodger, { x: square.centerX + 30, y: square.centerY, vx: 0, vy: 0 });
+SkillTimeline.begin(shooter, dodger, 'skill1');
+const attack = shooter.skillCast;
+Object.assign(attack, { action: 'volley', age: attack.charge + .17, nodes: [
+  { x: dodger.x - 150, y: dodger.y, vx: 1050, vy: 0 }
+] });
+CombatMovement.advance(square, 1 / 60);
+assert.ok(Math.abs(dodger.vy) > Math.abs(dodger.vx), 'The fighter sidesteps the incoming shot');
+assert.ok(CombatMovement.avoids(dodger, shooter, attack));
+assert.ok(!CombatMovement.avoids(dodger, shooter, {}), 'The dodge protects against the telegraphed attack');
+assert.ok(square.floatingTexts.some(text => text.text === 'NÉ ĐÒN'), 'The dodge has a callout');
+const dodgeHit = square.applyDamage(shooter, dodger, 5, { color: '#fff', attack, skill: attack, isRanged: true });
+assert.ok(dodgeHit.blocked && dodgeHit.amount === 0);
+assert.equal(square.skillHits.length, 0, 'A dodged attack must not leave an impact');
+assert.equal(dodger.skillReaction, null);
+console.log('PASS: Verified square walls, corner separation, and a directional dodge against an incoming shot.');
+
+const strike = new BattleArena();
+strike.p1Id = 'hulk';
+strike.p2Id = 'ironman';
+strike.reset();
+strike.elapsed = 30;
+strike.time = 30;
+const [striker, defender] = strike.fighters;
+SkillTimeline.begin(striker, defender, 'ultimate');
+const smash = striker.skillCast;
+const start = FighterAnimator.pose(defender, strike.time, false, false);
+const landed = strike.applyDamage(striker, defender, 6, { color: smash.color, skill: smash, attack: smash });
+assert.ok(landed.amount > 0, 'The skill landed');
+assert.equal(strike.skillHits.length, 1);
+assert.equal(defender.skillReaction.mode, 'heavy');
+assert.ok(FighterAnimator.pose(defender, strike.time, false, false).x > start.x, 'Defender recoils away from the caster');
+assert.equal(UltimateAnimator.pose(strike, defender, defender.radius).clip, 'flinch');
+assert.equal(FighterAnimator.reaction(defender, strike.time + .45), null, 'The flinch ends after recovery');
+console.log('PASS: A landed skill creates directional recoil and impact art, while a dodge creates neither.');
 
 for (const [duration, side] of [[3.4, 1], [30, 0], [60, 1], [93.7, 0]]) {
   const battle = new BattleArena();
@@ -103,10 +169,11 @@ for (const [duration, side] of [[3.4, 1], [30, 0], [60, 1], [93.7, 0]]) {
     return hit;
   };
   let halfway;
-  const radius = battle.arenaRadius;
+  const halfSize = battle.arenaHalfSize;
   for (let step = 0; !battle.koState && step < duration * 70 + 1; step++) {
     assert.ok(battle.fighters.every(fighter => fighter.currentHp > 0), 'Early K.O.');
     battle.update(1 / 60);
+    assert.ok(battle.fighters.every(fighter => ArenaBounds.contains(battle, fighter, fighter.radius)), 'Fighter left the square');
     if (!halfway && battle.elapsed >= duration / 2) halfway = battle.fighters.map(fighter => fighter.currentHp);
   }
   assert.ok(halfway?.every(hp => hp > 34 && hp < 64), 'Damage was not distributed across the match');
@@ -117,7 +184,7 @@ for (const [duration, side] of [[3.4, 1], [30, 0], [60, 1], [93.7, 0]]) {
   assert.equal(battle.elapsed, duration);
   assert.equal(battle.koState.winner.side, side);
   assert.equal(battle.koState.loser.currentHp, 0);
-  assert.equal(battle.arenaRadius, radius);
+  assert.equal(battle.arenaHalfSize, halfSize);
   assert.ok(battle.finalFormStages.every(Boolean), 'Both final arena elements should coexist');
 }
 console.log('PASS: Damage is spread across timed matches, including a real last hit at 60 seconds.');
@@ -146,7 +213,7 @@ assert.equal(spider.skillCast.action, 'webArena');
 assert.ok(spider.skillCast.age >= spider.skillCast.charge, 'The ultimate releases without charging again');
 for (let frame = 0; frame < 23; frame++) duel.update(1 / 60);
 const lattice = spider.skillCast.spectacle.paths.flat();
-assert.ok(Math.max(...lattice.map(point => point.x)) - Math.min(...lattice.map(point => point.x)) > duel.arenaRadius * 1.78);
+assert.ok(Math.max(...lattice.map(point => point.x)) - Math.min(...lattice.map(point => point.x)) > duel.arenaHalfSize * 1.78);
 for (let frame = 0; frame < 94; frame++) duel.update(1 / 60);
 assert.ok(duel.finalFormStages.every(Boolean));
 assert.equal(hulk.skillCast?.action, 'stomp');

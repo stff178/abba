@@ -6,100 +6,6 @@ const FinalPortraits = (() => {
     const pearl = '#fff8e7';
 
     // Each profile has a silhouette plate, secondary color and crest.
-    const ornaments = {
-      spider_man: ['#3d3588', 'M.55 .64 L.86 .37 L1.12 .49 L1.52 .065 L1.66 -.29 L1.43 -.24 L1.23 .14 L.96 .22 L.70 .13Z', 'web'],
-      ironman: ['#535783', 'M.50 .62 L.96 .50 L1.44 -.15 L1.40 -.80 L1.23 -.48 L.82 -.28 L.72 .06Z', 'reactor'],
-      wolverine: ['#5a3d55', 'M.49 -.22 L.70 -.40 L.94 -1.40 L1.17 -1.24 L.99 -.82 L1.08 -.36 L.81 .18 L.54 .23Z', 'fang'],
-      deadpool: ['#63365d', 'M.48 .64 L.86 .56 L1.40 -.47 L1.36 -.60 L1.16 -.58 L.62 .45Z', 'cross'],
-      captain_america: ['#315782', 'M.48 .51 Q.92 -.13 1.27 .13 Q1.55 .53 1.17 .80 Q.91 .86 .57 .68Z', 'star'],
-      thor: ['#497294', 'M.48 -.40 L.91 -.57 L1.29 -1.38 L1.51 -1.40 L1.22 -.64 L1.44 -.64 L.91 -.12 L.66 -.06Z', 'bolt'],
-      hulk: ['#455740', 'M.64 .37 L.99 .09 L1.34 .26 L1.53 .78 Q1.12 1.10 .66 .91Z', 'fault'],
-      doctor_strange: ['#653d78', 'M.61 .65 Q1.41 .36 1.37 -.81 Q.98 -.34 .88 -.65 Q.67 -.33 .70 .19Z', 'eye'],
-      scarlet_witch: ['#8e315c', 'M.61 .34 Q1.06 -.38 1.11 -1.23 L1.37 -1.54 Q1.29 -.46 1.46 -.10 L1.16 -.01 L.90 .53Z', 'hex'],
-      thanos: ['#6b5879', 'M.58 .63 L.93 .19 L1.23 .24 L1.52 .59 L1.4 .82 L.97 .94 L.66 .76Z', 'gems'],
-      black_panther: ['#3a315d', 'M.60 -.03 L.75 -.26 L1.17 -.87 L1.24 -.46 Q1.54 -.32 1.39 .22 L1.00 .56 L.64 .44Z', 'fang'],
-      loki: ['#2c6654', 'M.60 .51 Q1.06 .08 1.17 -.63 L1.39 -.96 Q1.36 -.35 1.59 -.32 L1.37 -.19 L1.16 .36 L.76 .72Z', 'branch'],
-      venom: ['#482944', 'M.61 .61 Q.89 -.56 1.51 -1.20 L1.41 -.57 L1.67 -.49 L1.48 -.15 L1.54 .08 L1.15 .03 L.77 .64Z', 'fang'],
-      doctor_doom: ['#577364', 'M.56 .46 L.77 .10 L.92 -.56 L1.23 -.71 L1.44 -.53 L1.36 -.05 L.98 .34 L.72 .77Z', 'reactor'],
-      ghost_rider: ['#5c4975', 'M.60 .19 Q1.03 -.04 1.18 -.46 L1.42 -.94 Q1.44 -.57 1.28 -.23 Q1.61 -.43 1.56 -.14 Q1.31 .17 1.27 .58 L.69 .75Z', 'chain'],
-      black_widow: ['#664157', 'M.63 .55 L.90 .26 L.86 -.23 L1.14 -.39 L1.40 -.25 L1.49 .02 L1.32 .32 L.91 .68Z', 'hourglass'],
-      magneto: ['#775580', 'M.65 .47 L.93 .29 L.91 -.54 L1.21 -.82 L1.47 -.72 L1.34 -.29 L1.47 -.05 L1.15 .12 L.86 .63Z', 'magnet'],
-      captain_marvel: ['#906180', 'M.57 .59 L1.12 .39 L1.51 -.24 L1.50 -.55 L1.18 -.36 L.94 -.25 L.73 .04Z', 'star'],
-      moon_knight: ['#615580', 'M.56 .57 Q.99 .50 1.30 .06 Q1.53 -.31 1.26 -.90 Q1.83 -.53 1.56 .14 Q1.33 .64 .70 .85Z', 'moon'],
-      silver_surfer: ['#536498', 'M.56 .69 Q1.10 .47 1.54 .13 Q1.54 .26 1.39 .54 Q1.10 .88 .70 .92Z', 'wave'],
-      gojo: ['#624b97', 'M.58 -.25 L.79 -.53 L1.37 -.88 L1.13 -.39 L1.35 -.26 L.99 .14 L.66 .23Z', 'infinity'],
-      sukuna: ['#873f62', 'M.60 .27 L.99 -.02 L1.01 -.75 L1.24 -.89 L1.47 -.69 L1.32 -.17 L1.55 -.03 L1.16 .43 L.72 .67Z', 'hex'],
-      naruto: ['#96585c', 'M.62 .25 Q1.03 -.18 1.49 -1.14 Q1.60 -.46 1.23 .14 Q1.59 -.08 1.63 .28 Q1.28 .66 .73 .70Z', 'fox'],
-      luffy: ['#7a5791', 'M.58 .53 Q.87 .62 1.03 .25 Q1.32 .10 1.32 .47 Q1.61 .54 1.46 .77 Q1.36 .99 1.02 .88 Q.80 1.06 .60 .78Z', 'sun'],
-      eren: ['#624753', 'M.55 .50 L.81 .04 L.94 -.68 L1.25 -.99 L1.47 -.88 L1.13 -.44 L1.28 -.05 L1.19 .51 L.77 .91Z', 'fault'],
-      levi: ['#466174', 'M.58 .63 L.81 .48 L1.28 -.58 L1.43 -.91 L1.47 -.61 L1.24 .42 L.75 .81Z', 'cross'],
-      doraemon: ['#466f9e', 'M.59 .39 L.85 .12 L.81 -.37 L1.14 -.65 L1.38 -.49 L1.46 -.12 L1.22 .18 L.87 .67Z', 'reactor'],
-      frieren: ['#65588a', 'M.61 .56 Q1.34 .17 1.29 -.86 L1.51 -.99 Q1.55 -.27 1.29 .20 Q1.11 .55 .73 .78Z', 'star']
-    };
-
-    const crests = {
-      web: 'M-.24 0 L0 -.23 L.24 0 L0 .23Z M-.24 0 L.24 0 M0 -.23 L0 .23',
-      reactor: 'M0 -.25 L.22 -.13 L.22 .13 L0 .25 L-.22 .13 L-.22 -.13Z M-.10 .03 L0 -.115 L.10 .03 L0 .14Z',
-      fang: 'M-.27 -.17 L-.06 -.09 L-.12 .20Z M.27 -.17 L.06 -.09 L.12 .20Z',
-      cross: 'M-.23 -.24 L.23 .24 M.23 -.24 L-.23 .24 M-.14 -.24 L.26 .17 M.14 -.24 L-.26 .17',
-      star: 'M0 -.27 L.067 -.076 L.25 -.071 L.102 .044 L.153 .23 L0 .123 L-.153 .23 L-.102 .044 L-.25 -.071 L-.067 -.076Z',
-      bolt: 'M.03 -.30 L-.21 .031 L-.02 .005 L-.07 .29 L.23 -.09 L.05 -.067Z',
-      fault: 'M-.22 -.12 L-.06 -.17 L-.075 .015 L.079 -.06 L.015 .156 L.19 .13',
-      eye: 'M-.27 .01 Q0 -.26 .27 .01 Q0 .25 -.27 .01Z M0 -.11 L0 .12',
-      hex: 'M-.22 -.18 L.22 -.18 L0 .233Z M-.23 .13 L.23 .13 L0 -.255Z',
-      gems: 'M-.22 0 L-.11 -.19 L.11 -.19 L.22 0 L.11 .19 L-.11 .19Z M-.22 0 L.22 0 M0 -.19 L0 .19',
-      branch: 'M0 .23 L0 -.24 M0 -.09 L-.16 -.20 M0 -.03 L.17 -.19 M0 .12 L-.20 .03 M0 .15 L.18 .04',
-      chain: 'M-.24 -.13 Q-.12 -.27 .02 -.11 L.20 .07 Q.35 .23 .20 .29 Q.07 .32 -.05 .17 L-.25 -.03Z',
-      hourglass: 'M-.19 -.22 L.19 -.22 L.067 0 L.19 .22 L-.19 .22 L-.067 0Z',
-      magnet: 'M-.22 -.17 L-.22 .06 Q-.22 .25 0 .25 Q.22 .25 .22 .06 L.22 -.17 M-.22 -.01 L-.12 -.01 M.22 -.01 L.12 -.01',
-      moon: 'M.18 .16 A.23 .23 0 1 1 -.11 -.21 Q-.14 .12 .18 .16Z',
-      wave: 'M-.23 .03 Q-.10 -.16 .035 -.032 Q.16 .09 .23 -.063 M-.18 .133 Q-.033 -.012 .071 .133',
-      infinity: 'M0 0 Q-.23 -.29 -.27 -.038 Q-.31 .22 0 0 Q.25 -.30 .28 -.059 Q.34 .25 0 0Z',
-      fox: 'M-.26 -.21 L-.14 -.101 L0 -.166 L.14 -.101 L.26 -.21 L.22 .07 L0 .23 L-.22 .07Z',
-      sun: 'M0 -.29 L0 -.17 M0 .17 L0 .29 M-.29 0 L-.17 0 M.17 0 L.29 0 M-.15 -.15 L-.23 -.23 M.15 .15 L.23 .23 M.15 -.15 L.23 -.23 M-.15 .15 L-.23 .23 M0 -.13 A.13 .13 0 1 1 -.001 -.13Z'
-    };
-
-    function paintBehind(ctx, id, style) {
-      const entry = ornaments[id];
-      if (style.form !== 4 || !entry || style.compact) return;
-      const [shade, plate] = entry;
-      const { color, time = 0 } = style;
-      ctx.save();
-      for (const sign of [-1, 1]) {
-        ctx.save();
-        ctx.scale(sign, 1);
-        ctx.rotate(Math.sin(time * 3.4 + sign * .43) * .036);
-        const metal = ctx.createLinearGradient(.5, .2, 1.49, -.68);
-        metal.addColorStop(0, shade);
-        metal.addColorStop(.54, shade);
-        metal.addColorStop(1, color);
-        shape(ctx, plate, metal, '#211d39', .051);
-        ctx.globalAlpha *= .83;
-        shape(ctx, 'M.748 .464 L.904 .331 L1.017 .365 L1.202 .121', null, color, .028);
-        ctx.restore();
-      }
-      ctx.globalAlpha *= .58;
-      ctx.lineWidth = .038;
-      ctx.strokeStyle = color;
-      for (const turn of [-1, 1]) {
-        ctx.beginPath();
-        ctx.ellipse(0, -.14, 1.45, 1.34, turn * .37, time * .60 * turn + .57, time * .60 * turn + 2.16);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    function paintCrest(ctx, id, style) {
-      const entry = ornaments[id];
-      if (!entry || style.form !== 4 || style.compact) return;
-      ctx.save();
-      ctx.translate(0, .83);
-      ctx.rotate(Math.sin((style.time || 0) * 2) * .063);
-      oval(ctx, 0, 0, .34, .31, '#24233d', style.color);
-      shape(ctx, crests[entry[2]], null, style.color, .044);
-      ctx.restore();
-    }
-
     function dawnMonkey(ctx, { color, pose, wind }) {
       const fur = '#bc795f';
       const faceTone = '#f5cda0';
@@ -129,7 +35,7 @@ const FinalPortraits = (() => {
     function titan(ctx, { form, pose, color }) {
       collar(ctx, '#633f52', form >= 3 ? '#bd7a71' : '#9a5c61', '#412e44');
       shape(ctx, 'M-.91 .61 L-.83 -.69 Q-.73 -1.19 -.20 -1.25 Q.39 -1.37 .773 -1.00 L.9 .24 L1.07 .75 L.75 .68 L.64 .92 L.41 .66 L-.56 .77Z', '#3a293b');
-      face(ctx, form === 2 ? '#e4b29b' : '#f0c4a9', '#a57475', { broad: true, pointy: true });
+      face(ctx, form === 4 ? '#c4a78d' : form === 3 ? '#e3dde0' : form === 2 ? '#e4b29b' : '#f0c4a9', form === 3 ? '#9892a5' : '#a57475', { broad: true, pointy: true });
       shape(ctx, 'M-.75 .24 Q-.93 -.26 -.73 -.73 Q-.572 -1.20 -.22 -1.22 Q.157 -1.46 .639 -.996 L.801 -.711 L.739 -.288 L.626 -.428 L.58 -.664 Q.37 -.858 .301 -.865 L.48 -.56 L.152 -.665 L.206 -.505 L-.112 -.655 L-.299 -.421 L-.364 -.616 Q-.58 -.504 -.64 -.243 L-.56 .563 L-.707 .481Z', form === 4 ? '#5e3f4e' : '#493541');
       shape(ctx, 'M-.670 -.639 Q-.542 -.976 -.213 -1.072 L-.274 -.863 M.162 -1.147 Q.496 -1.031 .585 -.769 M.689 -.555 L.695 -.175', null, '#966475', .055);
       eyes(ctx, color, pose);
@@ -165,7 +71,7 @@ const FinalPortraits = (() => {
       return true;
     }
 
-    return { paintBehind, paintCrest, drawBody };
+    return { drawBody };
   }
 
   return { create };

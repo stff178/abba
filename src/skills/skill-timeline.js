@@ -15,7 +15,9 @@ const SkillTimeline = (() => {
     blue: '#69b5ff', red: '#ff4c72', purple: '#b988ff', void: '#a9acf9', shrine: '#ff6981',
     cursedSlash: '#ffc7d4', repulsor: '#80e9ff', unibeam: '#a0e9ff', web: '#ddebff',
     widowBite: '#81d9ff', hellChain: '#ff984b', lightning: '#b2dcff', photon: '#ffd67b',
-    rasengan: '#83e6ff', rasenshuriken: '#b4f0ff', chakraBomb: '#cc79ff', zoltraak: '#ddf9ff'
+    rasengan: '#83e6ff', rasenshuriken: '#b4f0ff', chakraBomb: '#cc79ff', zoltraak: '#ddf9ff',
+    divineFlame:'#ff9760', hotClaws:'#ffad74', baryon:'#ff8b62', timeCloth:'#ff9ebe', snap:'#ffe5b5',
+    twinRepulsor:'#a8ecff', twinPhoton:'#ffcc72', thread:'#bcf297', smallLight:'#ffeb8e'
   };
 
   function begin(fighter, target, slot = 'skill1', intensity = 0) {
@@ -33,6 +35,7 @@ const SkillTimeline = (() => {
     fighter.skillCast = {
       slot, kind, name: move?.name, action: move?.action, technique: move?.technique,
       contact: move?.contact, pattern: 'arc', power, spectacle, bend, target, intensity,
+      facing: Math.sign(target.x - fighter.x) || (fighter.side ? -1 : 1),
       charge: (kind === 'signature' && isUltimate ? .39 : charge) * (1 - intensity * .18),
       active: kind === 'signature'
         ? active + (isUltimate ? .18 + stage * .14 : stage * .035) + (spectacle ? .14 : 0) + (boomerang ? .31 : 0)
@@ -44,7 +47,7 @@ const SkillTimeline = (() => {
 
   function advanceRotation(arena, fighter, target, dt) {
     update(arena, fighter, dt);
-    if (fighter.skillCast || fighter.formBefore || arena.elapsed < fighter.nextCastAt) return;
+    if (fighter.skillCast || fighter.formBefore || fighter.motion.dodge > .10 || arena.elapsed < fighter.nextCastAt) return;
     const sequence = fighter.formStage === 4 ? finalRotation : rotation;
     const slot = sequence[fighter.castIndex % sequence.length];
     fighter.castIndex++;
@@ -70,12 +73,14 @@ const SkillTimeline = (() => {
     const uy = dy / direction;
     const power = 1 + cast.form * .035;
 
-    cast.origin = UltimateAnimator.origin(fighter, cast);
+    cast.origin = UltimateAnimator.emitsFromBody(cast.technique)
+      ? UltimateAnimator.origin(arena, fighter, cast, 1, true) : { x: fighter.x, y: fighter.y };
     cast.targetPoint = {
       x: target.x + target.vx * .065,
       y: target.y + target.vy * .065
     };
     cast.aim = Math.atan2(cast.targetPoint.y - cast.origin.y, cast.targetPoint.x - cast.origin.x);
+    cast.releaseMark = { ...cast.origin, angle: cast.aim };
 
     cast.previous = cast.kind === 'fist' ? fistPoint(fighter, cast, 0) : cast.origin;
 
@@ -97,9 +102,10 @@ const SkillTimeline = (() => {
     }
     const isUltimate = cast.slot === 'ultimate';
     if (isUltimate) ArenaEffects.castUltimate(arena, fighter, cast);
-    const reach = cast.contact ? 27 : (isUltimate ? 125 : 50) + cast.intensity * 42;
-    arena.spawnRing(fighter.x, fighter.y, fighter.radius * .7, fighter.radius + reach, cast.color, .36);
-    arena.spawnParticles(fighter.x, fighter.y, cast.color, (isUltimate ? 17 : 8) + Math.round(cast.intensity * 8), 245);
+    const from = cast.releaseMark;
+    if (!cast.contact && cast.kind !== 'fist') {
+      arena.spawnParticles(from.x, from.y, cast.color, isUltimate ? 8 : 4, 148);
+    }
   }
 
   function segmentDistance(x, y, start, end) {
@@ -112,8 +118,8 @@ const SkillTimeline = (() => {
 
   function fistPoint(fighter, cast, t) {
     const facing = Math.sign(cast.targetPoint.x - fighter.x) || (fighter.side ? -1 : 1);
-    const startX = fighter.x + facing * fighter.radius * .68;
-    const startY = fighter.y + fighter.radius * .58;
+    const startX = cast.armRoot?.x ?? fighter.x + facing * fighter.radius * .68;
+    const startY = cast.armRoot?.y ?? fighter.y + fighter.radius * .58;
     const dx = cast.targetPoint.x - startX;
     const dy = cast.targetPoint.y - startY;
     const distance = Math.hypot(dx, dy) || 1;
@@ -144,14 +150,15 @@ const SkillTimeline = (() => {
       ? arena.processExchange(fighter, target, impactX, impactY, dx / distance, dy / distance, true)
       : arena.applyDamage(fighter, target, power + cast.form * .4, {
         color: cast.color,
+        attack: cast,
+        skill: cast,
         label: '-0',
         size: 34
       });
     if (result.blocked || result.amount <= 0) return;
     target.vx += dx / distance * 205;
     target.vy += dy / distance * 205;
-    arena.spawnRing(target.x, target.y, 15, 110 + cast.form * 24, cast.color, .32);
-    arena.spawnParticles(target.x, target.y, cast.color, 16, 360);
+    arena.spawnParticles(target.x, target.y, cast.color, 7, 240);
     arena.addShake(7 + cast.form * 2 + cast.intensity * 3);
     arena.hitStop = Math.max(arena.hitStop, .025);
   }
@@ -171,6 +178,7 @@ const SkillTimeline = (() => {
     }
     if (direct && oldAge < cast.charge + cast.active && elapsed >= 0 && cast.impactAge === null) {
       const progress = Math.min(1, elapsed / cast.active);
+      if (cast.kind === 'fist') cast.armRoot = UltimateAnimator.origin(arena, fighter, cast);
       if (cast.kind === 'melee' && progress < .85) {
         const dx = cast.target.x - fighter.x;
         const dy = cast.target.y - fighter.y;
@@ -179,32 +187,20 @@ const SkillTimeline = (() => {
         fighter.vx += (1100 * dx / distance - fighter.vx) * steer;
         fighter.vy += (1100 * dy / distance - fighter.vy) * steer;
       }
-      if (hitDistance(fighter, cast, progress) <= cast.target.radius) impact(arena, fighter, cast);
+      if (hitDistance(fighter, cast, progress) <= cast.target.radius && !CombatMovement.avoids(cast.target, fighter, cast)) {
+        impact(arena, fighter, cast);
+      }
     }
 
     if (elapsed >= cast.active + cast.recovery) fighter.skillCast = null;
   }
 
-  function drawCharge(ctx, fighter, cast) {
-    const progress = cast.age / cast.charge;
-    const ultimate = cast.slot === 'ultimate';
-    const r = fighter.radius * (ultimate ? 1.18 : 1);
-    ctx.translate(fighter.x, fighter.y);
-    ctx.strokeStyle = cast.color;
-    ctx.lineWidth = 3.5;
-    ctx.globalAlpha = .25 + .5 * progress;
-    ctx.beginPath();
-    ctx.arc(0, 0, r * (1.65 - progress * .37), cast.age * 10, cast.age * 10 + Math.PI * 1.55);
-    ctx.stroke();
-    ctx.fillStyle = cast.color;
-    const sparks = (ultimate ? 10 : 5) + Math.round(cast.intensity * 4);
-    for (let i = 0; i < sparks; i++) {
-      const angle = i * Math.PI * 2 / sparks + cast.age * 8;
-      const reach = r * (1.42 - progress * .49);
-      ctx.beginPath();
-      ctx.arc(Math.cos(angle) * reach, Math.sin(angle) * reach, 3 + progress * 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
+  function drawCharge(ctx, fighter, cast, arena) {
+    if (!cast.technique || !arena) return;
+    const mode = SkillInk.kind(cast.technique);
+    const aim = Math.atan2(cast.target.y - fighter.y, cast.target.x - fighter.x);
+    const from = UltimateAnimator.origin(arena, fighter, cast);
+    SkillInk.windup(ctx, from, aim, cast.color, cast.age / cast.charge, mode, cast.power);
   }
 
   function drawFist(ctx, fighter, cast, progress, alpha) {
@@ -233,8 +229,10 @@ const SkillTimeline = (() => {
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
+    const angle = Math.atan2(tip.y - near.y, tip.x - near.x);
+    if (reach > .12) SkillInk.speed(ctx, near, angle, 52 + width, width * .86, '#fff0d6', alpha * .71);
     ctx.translate(tip.x, tip.y);
-    ctx.rotate(Math.atan2(tip.y - near.y, tip.x - near.x));
+    ctx.rotate(angle);
     const size = (25 + cast.form * 6) * Math.max(.2, alpha);
     ctx.scale(size, size);
     ctx.beginPath();
@@ -314,43 +312,35 @@ const SkillTimeline = (() => {
     ctx.stroke();
   }
 
-  function drawBackground(ctx, fighter) {
-    const cast = fighter.skillCast;
-    if (!cast || !cast.spectacle || cast.age < cast.charge) return;
-    const elapsed = cast.age - cast.charge - cast.active;
-    const alpha = 1 - Math.min(1, Math.max(0, elapsed / cast.recovery));
-    ArenaUltimates.draw(ctx, fighter, cast, alpha, true);
+  function visibility(cast) {
+    const elapsed = cast.age - cast.charge;
+    const progress = Math.min(1, elapsed / cast.active);
+    const alpha = 1 - Math.min(1, Math.max(0, (elapsed - cast.active) / cast.recovery));
+    return { progress, alpha };
   }
 
-  function draw(ctx, fighter) {
+  function drawBackground(ctx, fighter) {
+    const cast = fighter.skillCast;
+    if (!cast || cast.age < cast.charge || cast.kind !== 'signature') return;
+    const { progress, alpha } = visibility(cast);
+    SignatureSkills.drawBackground(ctx, fighter, cast, progress, alpha);
+  }
+
+  function draw(ctx, fighter, arena) {
     const cast = fighter.skillCast;
     if (!cast) return;
     ctx.save();
     if (cast.age < cast.charge) {
-      drawCharge(ctx, fighter, cast);
+      drawCharge(ctx, fighter, cast, arena);
     } else {
-      const elapsed = cast.age - cast.charge;
-      const progress = Math.min(1, elapsed / cast.active);
-      const alpha = 1 - Math.min(1, Math.max(0, (elapsed - cast.active) / cast.recovery));
+      const { progress, alpha } = visibility(cast);
+      SkillInk.launch(ctx, cast);
       if (cast.kind === 'fist') drawFist(ctx, fighter, cast, progress, alpha);
       else if (cast.kind === 'signature') SignatureSkills.draw(ctx, fighter, cast, progress, alpha);
       else if (cast.kind === 'melee') drawMelee(ctx, fighter, cast, progress, alpha);
       else drawCastWake(ctx, fighter, cast, progress, alpha);
-
     }
     ctx.restore();
-
-    if (cast.impactAge !== null && cast.age - cast.impactAge < .13) {
-      const flash = 1 - (cast.age - cast.impactAge) / .13;
-      ctx.save();
-      ctx.globalAlpha = flash * .58;
-      ctx.strokeStyle = '#fff6e8';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.arc(cast.target.x, cast.target.y, 27 + (1 - flash) * 45, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 
   return { begin, update, advanceRotation, fireUltimate, drawBackground, draw };

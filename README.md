@@ -15,7 +15,7 @@ A zero-dependency, 60 FPS **2D Physics Anime Ball Battle Simulator** built with 
 - **Seeded Physics:** The seed controls the initial movement, combat variance, critical hits and dodge rolls.
 - **Automatic Skill Rotation:** Fighters alternate between tactical, melee and ultimate casts. Each form has a different ultimate. Later forms use wider effects, stronger impacts and arena changes.
 - **Timed Finish:** Set the fight duration and choose Left, Right, or the side with more remaining HP. Both fighters trade damage throughout the round. The final hit lands at the time limit and finishes the defeated fighter.
-- **Arena Clash:** The arena keeps its size. When both fighters fall below 50 HP, the floor and rim light up in the fighters' colors.
+- **Square Arena:** Fighters and ricochets bounce off four straight walls. Fighters separate after exchanging hits and can sidestep incoming lunges or projectiles. When both fighters fall below 50 HP, their colors light up the floor and edges.
 - **Fighter Forms:** All 28 fighters have five forms, unlocked at 80, 60, 40 and 20 HP. Portraits, cast patterns and abilities evolve with each form. Two final arena effects can be active together. On the final form, a one-second camera move pauses combat and leads directly into the ultimate. The match timer continues toward the configured finish.
 - **Multi-Layered Visual Identity:** Supports custom **PNG/WebP Avatar URLs** or built-in recognizable Canvas vector portraits, glowing neon auras, pill-shaped HP badges on each orb, and under-HUD manga skill callouts that never block the arena view.
 - **Built-In 1080p Full HD Video Recorder (`60 FPS`, `12 Mbps`):** Toggle **`Auto-Rec 1080p`** to automatically record directly from the `1080×1920` Canvas + procedural SFX audio from `Start` until the K.O. results card finishes — zero UI clutter in the exported video.
@@ -26,20 +26,21 @@ A zero-dependency, 60 FPS **2D Physics Anime Ball Battle Simulator** built with 
 
 ## Original Roster and Marvel Expansion
 
-The [roster](src/characters/fighter-roster.js) contains 28 fighters with five forms each. The [move sets](src/skills/ultimate-moves.js) specify both regular skills and an ultimate for every form. Ultimate animations move the fighter's arms and legs through anticipation, release and recovery. The [Canvas animator](src/animation/ultimate-animator.js) also draws equipment such as Levi's blades, Thor's hammer and Frieren's staff.
+The [roster](src/characters/fighter-roster.js) contains 28 fighters with five forms each. The [move sets](src/skills/ultimate-moves.js) define two regular skills and an ultimate per form. The [portrait layers](src/characters/form-portraits.js) draw a distinct outfit at each HP threshold. The [Canvas animator](src/animation/ultimate-animator.js) animates arms, wrists, grips and props through wind-up, release and recovery. Each landed skill adds a directional impact and a brief recoil pose to the fighter it hits.
 
 | Fighter | Examples in the game |
 | --- | --- |
-| Hulk | Hooks, grapples, shoulder charges and a close-range World Breaker ground slam |
-| Spider-Man | Wrist webs, swing kicks and an arena-wide web |
-| Iron Man | Palm repulsors, chest Unibeam and an armor formation |
-| Thor and Captain America | Mjolnir lightning and hammer throws, plus Captain America's returning shield |
-| Gojo and Sukuna | Blue, Red and Hollow Purple for Gojo, Cleave and Malevolent Shrine for Sukuna |
-| Naruto and Luffy | Rasengan and shadow clones for Naruto, elastic strikes and Bajrang Gun for Luffy |
-| Eren and Levi | Titan strikes and the Rumbling for Eren, ODM cables and Thunder Spears for Levi |
-| Doraemon and Frieren | Air Cannon, Small Light and Anywhere Door for Doraemon, Zoltraak and defensive magic for Frieren |
+| Hulk | Gray Hulk counters, a gladiator hammer, World War Hulk ground strikes and Immortal Hulk's close-range smash |
+| Spider-Man and Iron Man | Web-shooter gestures, Symbiote and Iron Spider forms, plus twin repulsors and the Mark LXXXV gauntlet for Iron Man |
+| Thor and Captain America | Bifrost descent, paired Asgardian weapons and Captain America's returning shield |
+| Gojo and Sukuna | Blue, Red, Hollow Purple and Unlimited Void for Gojo, Divine Flame, Ten Shadows and Malevolent Shrine for Sukuna |
+| Naruto and Luffy | Sage Mode, Rasenshuriken and close-range Baryon strikes for Naruto, Gear 2 through Gear 5 and Bajrang Gun for Luffy |
+| Eren and Levi | Titan forms, War Hammer spikes and the Rumbling for Eren, reverse grips, ODM cables and Thunder Spears for Levi |
+| Doraemon and Frieren | Time Cloth rewinds position for Doraemon, Zoltraak, Judradjim, Vollzanbel and Dispel for Frieren |
 
-The studio's upgraded forms adapt the characters' signature abilities for this arena. References include [Marvel's character profiles](https://cdn.marvel.com/u/prod/marvel/i/pdf/MMRPG_CharacterProfiles_20240717.pdf), [Marvel's licensed character handbook](https://cdn.marvel.com/u/prod/marvel/i/pdf/MMRPG_MarvelRivals_20241220.pdf), [Jujutsu Kaisen](https://shueisha-games.com/wp-content/uploads/2024/05/96bd33ca03eb0b23834861b2301241ef.pdf), [Naruto](https://naruto-official.com/en/news/01_1802), [One Piece](https://one-piece.com/63303/index.html), [Attack on Titan](https://www.koeitecmoamerica.com/attackontitan2/finalbattle/feature.html?tgt=tgt-feature4), [Doraemon](https://www.tv-asahi.co.jp/doraemon/tool/ka.html) and [Frieren](https://frieren-anime.jp/special/magic/index.html).
+The [28-fighter reference](https://nghien-cuu-he-thong-suc-manh-28-nhan-vat-5sjh.pages.grok.bot/) guided the form order and skill gestures. The HP progression, some crossover variants and the Dawn Monkey design are adaptations for this arena.
+
+The studio's upgraded forms adapt the characters' signature abilities for this arena. References include [Marvel's character profiles](https://cdn.marvel.com/u/prod/marvel/i/pdf/MMRPG_CharacterProfiles_20240717.pdf), [Marvel's licensed character handbook](https://cdn.marvel.com/u/prod/marvel/i/pdf/MMRPG_MarvelRivals_20241220.pdf), [Jujutsu Kaisen](https://shueisha-games.com/wp-content/uploads/2024/05/96bd33ca03eb0b23834861b2301241ef.pdf), [Naruto](https://naruto-official.com/en/news/01_1895), [One Piece](https://one-piece.com/63303/index.html), [Attack on Titan](https://www.koeitecmoamerica.com/attackontitan2/finalbattle/feature.html?tgt=tgt-feature4), [Doraemon](https://www.tv-asahi.co.jp/doraemon_2017/tool/ta.html) and [Frieren](https://frieren-anime.jp/special/magic/index.html).
 
 ---
 

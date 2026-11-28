@@ -38,13 +38,16 @@ const MatchDamage = (() => {
 
   function pace(arena, attacker, defender, elapsed, closing) {
     const gap = defender.currentHp - targetHp(arena, defender, elapsed);
-    if (gap < (closing ? .15 : 1.15)) return;
+    if (gap < (closing ? .15 : 1.15)) return false;
 
     const color = FighterForms.color(attacker);
-    const hit = arena.applyDamage(attacker, defender, closing ? gap : Math.min(gap, defender.maxHp * .115), {
+    const limit = defender.maxHp * (arena.matchDuration <= 6 ? .28 : .115);
+    const hit = arena.applyDamage(attacker, defender, closing ? gap : Math.min(gap, limit), {
       isPaced: true, size: 24, color
     });
-    if (hit.amount > 0 && !hit.blocked) queueEffect(arena, attacker, defender, color, .58);
+    if (!hit.amount || hit.blocked) return false;
+    queueEffect(arena, attacker, defender, color, .58);
+    return true;
   }
 
   function steer(attacker, defender, dt, closing) {
@@ -53,8 +56,10 @@ const MatchDamage = (() => {
     const distance = Math.hypot(dx, dy) || 1;
     const speed = Math.min(closing ? 1570 : 1260, 420 + (distance - attacker.radius - defender.radius) * 3.2);
     const turn = Math.min(1, dt * (closing ? 19 : 12));
-    attacker.vx += (dx / distance * speed - attacker.vx) * turn;
-    attacker.vy += (dy / distance * speed - attacker.vy) * turn;
+    const arc = closing ? 0 : (attacker.side ? 1 : -1) * Math.min(.22, (distance - attacker.radius - defender.radius) / 1100);
+    const direction = Math.atan2(dy, dx) + arc;
+    attacker.vx += (Math.cos(direction) * speed - attacker.vx) * turn;
+    attacker.vy += (Math.sin(direction) * speed - attacker.vy) * turn;
   }
 
   function advance(arena, dt = 0) {
@@ -71,15 +76,45 @@ const MatchDamage = (() => {
     }
 
     const closing = Boolean(plan.closing);
+    const [left, right] = arena.fighters;
+    const distance = Math.hypot(left.x - right.x, left.y - right.y);
+    const reach = left.radius + right.radius + 20;
+    if (distance <= reach) {
+      let landed = false;
+      for (const defender of arena.fighters) {
+        const attacker = arena.fighters[1 - defender.side];
+        if (closing || (plan.pending[defender.side] && defender.motion.dodge <= .11 && attacker.motion.dodge <= .11)) {
+          landed = pace(arena, attacker, defender, arena.elapsed, false) || landed;
+          plan.pending[defender.side] = false;
+        }
+      }
+      if (landed && !closing) {
+        if (!left.skillCast?.contact || left.skillCast.finishedContact) CombatMovement.reset(arena, left, right, .25, 560);
+        if (!right.skillCast?.contact || right.skillCast.finishedContact) CombatMovement.reset(arena, right, left, .25, 560);
+      }
+      return;
+    }
+
+    if (closing) {
+      steer(left, right, dt, true);
+      steer(right, left, dt, true);
+      return;
+    }
+    let pursued = null;
+    let biggestGap = 0;
     for (const defender of arena.fighters) {
       const attacker = arena.fighters[1 - defender.side];
-      const distance = Math.hypot(attacker.x - defender.x, attacker.y - defender.y);
-      const reach = attacker.radius + defender.radius + 20;
-      if (distance <= reach) {
-        if (plan.pending[defender.side] || closing) pace(arena, attacker, defender, arena.elapsed, false);
-        plan.pending[defender.side] = false;
-      } else if (plan.pending[defender.side] || closing) {
-        steer(attacker, defender, dt, closing);
+      if (!plan.pending[defender.side] || attacker.motion.dodge > 0 || attacker.movement.reset > 0) continue;
+      const gap = defender.currentHp - targetHp(arena, defender, arena.elapsed);
+      if (gap <= biggestGap) continue;
+      biggestGap = gap;
+      pursued = defender;
+    }
+    if (pursued) {
+      const attacker = arena.fighters[1 - pursued.side];
+      steer(attacker, pursued, dt, false);
+      if (arena.matchDuration <= 6 && plan.pending[attacker.side] && pursued.motion.dodge <= .11) {
+        steer(pursued, attacker, dt, false);
       }
     }
   }
@@ -89,12 +124,8 @@ const MatchDamage = (() => {
     if (Math.hypot(chosen.x - defeated.x, chosen.y - defeated.y) <= separation) return;
 
     const angle = Math.atan2(defeated.y - chosen.y, defeated.x - chosen.x);
-    const mx = (chosen.x + defeated.x) / 2 - arena.centerX;
-    const my = (chosen.y + defeated.y) / 2 - arena.centerY;
-    const limit = (arena.arenaRadius - separation / 2 - Math.max(chosen.radius, defeated.radius) - 10);
-    const scale = Math.min(1, limit / (Math.hypot(mx, my) || 1));
-    const x = arena.centerX + mx * scale;
-    const y = arena.centerY + my * scale;
+    const midpoint = { x: (chosen.x + defeated.x) / 2, y: (chosen.y + defeated.y) / 2 };
+    const { x, y } = ArenaBounds.confine(arena, midpoint, separation / 2 + Math.max(chosen.radius, defeated.radius) + 10);
     const dx = Math.cos(angle) * separation / 2;
     const dy = Math.sin(angle) * separation / 2;
     Object.assign(chosen, { x: x - dx, y: y - dy });

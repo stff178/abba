@@ -16,9 +16,7 @@ const SignatureSkills = (() => {
   }
 
   function inside(arena, point, padding) {
-    const center = { x: arena.centerX, y: arena.centerY };
-    const reach = Math.min(Math.hypot(point.x - center.x, point.y - center.y), arena.arenaRadius - padding);
-    return offset(center, aim(center, point), reach);
+    return ArenaBounds.confine(arena, point, padding);
   }
 
   function distance(a, b) {
@@ -59,18 +57,22 @@ const SignatureSkills = (() => {
     cast.width = 12 + form * (power === 2 ? 9 : 5) + power * 6;
     arena.showFighterSkill(fighter, cast.name.toUpperCase(), cast.color);
     if (power === 2) arena.triggerUltimateCinematic(fighter, cast.name.toUpperCase(), cast.color);
+    if (ComicSkills.handles(cast.technique)) {
+      ComicSkills.release(arena,fighter,cast);
+      return;
+    }
     if (cast.contact) {
       ContactSkills.release(arena, fighter, cast);
       return;
     }
     if (cast.spectacle) ArenaUltimates.release(arena, fighter, cast);
-    const singleThrow = ['shieldThrow', 'hammerThrow', 'purple', 'chakraBomb'].includes(cast.technique);
+    const singleThrow = ['shieldThrow','hammerThrow','purple','chakraBomb','divineFlame','trickShot'].includes(cast.technique);
     const count = singleThrow ? 1 : action === 'stones' ? Math.min(6, form + 2) : 1 + Math.floor(form * .75) + power;
 
     if (shots.has(action)) {
       cast.nodes = Array.from({ length: count }, (_, i) => {
         const angle = cast.aim + (i - (count - 1) / 2) * (action === 'ricochet' ? .38 : .16);
-        const speed = 1040 + 45 * form;
+        const speed = (cast.technique === 'divineFlame' ? 790 : cast.technique === 'trickShot' ? 1490 : 1040) + 45 * form;
         return { ...offset(cast.origin, angle, fighter.radius * .35), vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed, color: action === 'stones' ? stoneColors[i] : cast.color,
           bounces: 0, hits: 0 };
@@ -81,16 +83,18 @@ const SignatureSkills = (() => {
       cast.gate = inside(arena, offset(cast.focus, cast.aim + 2.03, 122 + form * 13), fighter.radius + 12);
       Object.assign(fighter, cast.gate);
       leap(fighter, aim(fighter, target), 545 + form * 45);
-    } else if (action === 'dash' || action === 'claw' || (action === 'flame' && fighter.char.id === 'ghost_rider')) {
+    } else if (action === 'dash' || action === 'claw' || (action === 'flame' && fighter.char.id === 'ghost_rider' && cast.technique !== 'hellBreath')) {
       leap(fighter, cast.aim, 915 + form * 72 + power * 80);
-    } else if (action === 'web') {
-      const anchorAngle = aim({ x: arena.centerX, y: arena.centerY }, fighter) + (fighter.side ? .42 : -.42);
-      cast.anchor = offset({ x: arena.centerX, y: arena.centerY }, anchorAngle, arena.arenaRadius - 8);
-      leap(fighter, aim(fighter, cast.anchor) + (fighter.side ? -.83 : .83), 720 + form * 43);
     } else if (action === 'guard') {
       fighter.guardTimer = Math.max(fighter.guardTimer, .72 + form * .12);
-      cast.extraPower = Math.min(2, (fighter.custom.kinetic || 0) * .32);
-      fighter.custom.kinetic = 0;
+      if (cast.technique === 'kinetic') {
+        cast.extraPower = Math.min(2, (fighter.custom.kinetic || 0) * .32);
+        fighter.custom.kinetic = 0;
+      }
+      if (cast.technique === 'regeneration') {
+        fighter.currentHp = Math.min(fighter.maxHp, fighter.currentHp + 1.4 + form * .3);
+        arena.spawnRing(fighter.x,fighter.y,18,fighter.radius+30,'#adf0ad',.37);
+      }
     }
 
     cast.last = { x: fighter.x, y: fighter.y };
@@ -98,30 +102,30 @@ const SignatureSkills = (() => {
     if (action === 'lightning') arena.triggerFlash(cast.color, .11 + form * .018);
   }
 
-  function impact(arena, fighter, cast, part = 1, color = cast.color) {
+  function impact(arena, fighter, cast, part = 1, detail = {}) {
+    const { color = cast.color, point, source } = detail;
     const target = cast.target;
     const ultimate = cast.slot === 'ultimate';
     const attack = (ultimate ? 6.2 + cast.form * 1.85 : 2.0 + cast.power * .83 + cast.form * .55) * part + cast.extraPower;
-    const isArea = cast.action === 'webArena' || cast.action === 'titanMarch' || cast.action === 'nova';
-    const result = arena.applyDamage(fighter, target, attack, { color, isRanged: !cast.contact && !isArea && ranged.has(cast.action), isCrit: ultimate && cast.form === 4, size: ultimate ? 36 + cast.form * 3 : 28 });
+    const isArea = cast.comic || cast.action === 'webArena' || cast.action === 'titanMarch' || cast.action === 'nova';
+    const result = arena.applyDamage(fighter, target, attack, { color, attack: isArea ? null : cast, skill: cast, point, source,
+      isRanged: !cast.contact && !isArea && ranged.has(cast.action), isCrit: ultimate && cast.form === 4, size: ultimate ? 36 + cast.form * 3 : 28 });
     if (!result.amount || result.blocked) return;
 
     fighter.char.skills.passive?.(fighter, target, arena, 'onHitSuccess', result);
     if (cast.technique === 'smallLight') target.shrinkTimer = .8 + cast.power * .34;
+    if (cast.technique === 'baryon') target.damageDebuffTimer = Math.max(target.damageDebuffTimer, .44 + .2*cast.power);
     const direction = aim(fighter, target);
     const pull = ['tether', 'web', 'webArena'].includes(cast.action);
     const impulse = pull ? -155 - cast.form * 22 : 105 + cast.power * 28 + (ultimate ? cast.form * 42 : 0);
     target.vx += Math.cos(direction) * impulse;
     target.vy += Math.sin(direction) * impulse;
     if (pull || cast.action === 'stones') target.domainSlowTimer = Math.max(target.domainSlowTimer, .16 + cast.form * .035);
-    arena.spawnRing(target.x, target.y, 14, 64 + cast.form * 15 + cast.power * 12, color, .31);
-    arena.spawnParticles(target.x, target.y, color, 9 + cast.form * 2, 280 + cast.power * 90);
+    arena.spawnParticles(target.x, target.y, color, 4 + cast.form, 180 + cast.power * 45);
     arena.addShake(4 + cast.form + cast.power * 2);
   }
 
   function moveShots(arena, fighter, cast, dt) {
-    const center = { x: arena.centerX, y: arena.centerY };
-    const border = arena.arenaRadius - 11;
     for (const shot of cast.nodes) {
       if (shot.done) continue;
       const before = { x: shot.x, y: shot.y };
@@ -144,23 +148,21 @@ const SignatureSkills = (() => {
       }
       shot.x += shot.vx * dt;
       shot.y += shot.vy * dt;
-      if (!shot.hits && segmentDistance(cast.target, before, shot) <= cast.target.radius + 15 + cast.form * 2) {
+      if (!shot.hits && !CombatMovement.avoids(cast.target, fighter, cast) &&
+          segmentDistance(cast.target, before, shot) <= cast.target.radius + 15 + cast.form * 2) {
         shot.hits++;
-        impact(arena, fighter, cast, 1 / Math.sqrt(cast.nodes.length), shot.color);
-        if (cast.action !== 'ricochet') shot.done = true;
+        impact(arena, fighter, cast, 1 / Math.sqrt(cast.nodes.length), { color: shot.color, source: before });
+        if (cast.action !== 'ricochet') {
+          shot.done = true;
+          shot.hitAge = cast.age;
+        }
       }
-      if (distance(shot, center) < border) continue;
+      if (shot.done || ArenaBounds.contains(arena, shot, 11)) continue;
       if (cast.action !== 'ricochet' || shot.bounces >= 1 + cast.form) {
         shot.done = true;
         continue;
       }
-      const angle = aim(center, shot);
-      Object.assign(shot, offset(center, angle, border - 1));
-      const nx = Math.cos(angle);
-      const ny = Math.sin(angle);
-      const dot = shot.vx * nx + shot.vy * ny;
-      shot.vx -= 2 * dot * nx;
-      shot.vy -= 2 * dot * ny;
+      ArenaBounds.reflect(arena, shot, 11);
       shot.bounces++;
       arena.spawnRing(shot.x, shot.y, 8, 52, cast.color, .26);
     }
@@ -224,21 +226,25 @@ const SignatureSkills = (() => {
     const open = Math.min(1, progress * 3.9);
     const angle = aim(fighter, focus);
     if (action === 'beam') {
-      const count = ['zoltraak', 'cursedSlash'].includes(cast.technique) && power === 2 ? 2 + form : 1;
+      const twin = ['twinRepulsor','twinPhoton'].includes(cast.technique);
+      const cut = ['cursedSlash','worldSlash'].includes(cast.technique);
+      const count = twin ? 2 : cast.technique === 'worldSlash' ? 1
+        : ['zoltraak','cursedSlash'].includes(cast.technique) && power === 2 ? 2 + form : 1;
       const length = cast.technique === 'widowBite' ? 150 + form * 17 + power * 25 : 670 + power * 78;
       return Array.from({ length: count }, (_, index) => {
-        const direction = cast.aim + (index - (count - 1) / 2) * .14;
-        const end = offset(origin, direction, length * open);
-        if (cast.technique === 'cursedSlash') return curve(origin, end, (index % 2 ? 1 : -1) * (44 + form * 12) * open);
+        const source=twin && index===0 ? cast.otherHand : origin;
+        const direction = aim(source,focus) + (index - (count - 1) / 2) * (twin ? .03 : .14);
+        const end = offset(source, direction, length * open);
+        if (cut) return curve(source, end, (index % 2 ? 1 : -1) * (44 + form * 12) * open);
         if (cast.technique === 'widowBite') {
           return Array.from({ length: 7 }, (_, i) =>
             offset(offset(origin, direction, length * open * i / 6), direction + Math.PI / 2, i % 6 ? (i % 2 ? -1 : 1) * 6 : 0));
         }
-        return [origin, end];
+        return [source, end];
       });
     }
     if (action === 'web' || action === 'tether') {
-      const source = action === 'web' && power === 2 ? origin : offset(fighter, angle + .38, fighter.radius * .75);
+      const source = UltimateAnimator.emitsFromBody(cast.technique) ? origin : offset(fighter, angle + .38, fighter.radius * .75);
       const end = offset(source, aim(source, focus), distance(source, focus) * open);
       const count = 1 + (form >= 2 ? 2 : 0) + Number(power === 2);
       return Array.from({ length: count }, (_, i) => curve(source, offset(end, angle + Math.PI / 2, (i ? i * 10 : 0)), (i % 2 ? -1 : 1) * (i + form * .5) * 37 * open));
@@ -252,7 +258,7 @@ const SignatureSkills = (() => {
       const count = 1 + Math.ceil(form * .6) + Number(power === 2);
       return Array.from({ length: count }, (_, i) => {
         const hit = offset(focus, i * 1.6, i * 32);
-        const start = offset(hit, -Math.PI / 2 - i * .15, 190 + i * 22);
+        const start = cast.technique==='judradjim' ? origin : offset(hit, -Math.PI / 2 - i * .15, 190 + i * 22);
         const end = offset(start, aim(start, hit), distance(start, hit) * open);
         return Array.from({ length: 7 }, (_, j) => {
           const t = j / 6;
@@ -265,7 +271,7 @@ const SignatureSkills = (() => {
       const count = 1 + Math.ceil(form * .64) + power;
       cast.nodes = Array.from({ length: count }, (_, i) => {
         const center = action === 'satellite' ? { x: arena.centerX, y: arena.centerY } : fighter;
-        const reach = action === 'satellite' ? arena.arenaRadius * .66 : fighter.radius + 30 + form * 13 + (action === 'clone' ? 56 * open : 0);
+        const reach = action === 'satellite' ? arena.arenaHalfSize * .66 : fighter.radius + 30 + form * 13 + (action === 'clone' ? 56 * open : 0);
         return offset(center, i * TAU / count + cast.age * (action === 'orbit' ? 5 : 2) * (fighter.side ? -1 : 1), reach);
       });
       if (action === 'orbit') return cast.nodes.map(node => [node, offset(node, aim(node, target), open * (35 + form * 17))]);
@@ -276,7 +282,7 @@ const SignatureSkills = (() => {
       }
       return cast.nodes.map(node => curve(node, offset(node, aim(node, focus), distance(node, focus) * open), 0));
     }
-    if (action === 'flame' && fighter.char.id === 'frieren') {
+    if (action === 'flame' && (fighter.char.id === 'frieren' || cast.technique === 'hellBreath')) {
       return [-1, 0, 1].map(lane => curve(origin, offset(origin, cast.aim + lane * .22,
         open * (310 + form * 49 + power * 43)), lane * 28));
     }
@@ -292,12 +298,17 @@ const SignatureSkills = (() => {
 
   function advance(arena, fighter, cast, progress, dt) {
     if (cast.contact) {
-      ContactSkills.advance(arena, fighter, cast, progress, dt, part => impact(arena, fighter, cast, part));
+      ContactSkills.advance(arena, fighter, cast, progress, dt, (part, point) => impact(arena, fighter, cast, part, { point }));
       return;
     }
-    if (cast.power === 2 && UltimateAnimator.emitsFromBody(cast.technique)) {
-      cast.origin = UltimateAnimator.origin(fighter, cast);
-      cast.aim = aim(cast.origin, cast.focus);
+    if (UltimateAnimator.emitsFromBody(cast.technique) && !shots.has(cast.action) && !cast.comic) {
+      cast.origin = UltimateAnimator.origin(arena,fighter,cast);
+      cast.aim = aim(cast.origin,cast.focus);
+    }
+    if (['twinRepulsor','twinPhoton'].includes(cast.technique)) cast.otherHand=UltimateAnimator.origin(arena,fighter,cast,0);
+    if (cast.comic) {
+      ComicSkills.advance(arena,fighter,cast,progress,dt,part=>impact(arena,fighter,cast,part));
+      return;
     }
     if (cast.spectacle) {
       ArenaUltimates.advance(arena, fighter, cast, progress, dt, part => impact(arena, fighter, cast, part));
@@ -318,164 +329,281 @@ const SignatureSkills = (() => {
     const hit = cast.rays.some(path => path.some((point, index) =>
       index > 0 && segmentDistance(cast.target, path[index - 1], point) <= cast.target.radius + cast.contactRadius * .45
     ));
-    if (hit) pulse(arena, fighter, cast);
+    if (hit && !CombatMovement.avoids(cast.target, fighter, cast)) pulse(arena, fighter, cast);
   }
 
-  function strokePaths(ctx, paths) {
-    ctx.beginPath();
-    for (const path of paths) {
-      if (!path.length) continue;
-      ctx.moveTo(path[0].x, path[0].y);
-      for (const point of path.slice(1)) ctx.lineTo(point.x, point.y);
-    }
-    ctx.stroke();
-  }
+
 
   function circle(ctx, center, radius) {
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius, 0, TAU);
   }
 
-  function drawField(ctx, cast, progress, alpha) {
-    const { field, color, action } = cast;
-    if (cast.technique === 'airCannon') {
+  function drawField(ctx, cast, progress, alpha, background = false) {
+    const { field, color, action, technique } = cast;
+    const radius = field.reach;
+    if (technique === 'airCannon') {
+      if (background) return;
       ctx.save();
       ctx.translate(field.x, field.y);
       ctx.rotate(cast.aim);
-      ctx.strokeStyle = '#def5ff';
-      for (let i = 0; i < 4; i++) {
-        ctx.globalAlpha = alpha * (.72 - .13 * i) * (1 - progress * .55);
-        ctx.lineWidth = 4.8 - i * .65;
+      for (let i = 2; i >= 0; i--) {
+        ctx.globalAlpha = alpha * (.92 - i * .19) * (1 - progress * .24);
         ctx.beginPath();
-        ctx.ellipse(-i * 22, 0, field.reach * .29, field.reach * (1 - i * .16), 0, 0, TAU);
-        ctx.stroke();
+        ctx.ellipse(-i * 22, 0, radius * (.34 - i * .05), radius * (1 - i * .19), 0, -1.26, 1.26);
+        SkillInk.traced(ctx, color, 7.8 - i * 1.9, '#effcff');
       }
+      ctx.restore();
+      SkillInk.speed(ctx, field, cast.aim, 74 + radius * .37, radius * .31, '#caefff', alpha * .73);
+      return;
+    }
+
+    if (background) {
+      ctx.save();
+      ctx.globalAlpha *= alpha * (technique === 'blue' || technique === 'red' ? .29 : .16);
+      const glow = ctx.createRadialGradient(field.x, field.y, 0, field.x, field.y, radius);
+      glow.addColorStop(0, color);
+      glow.addColorStop(1, 'transparent');
+      circle(ctx, field, radius);
+      ctx.fillStyle = glow;
+      ctx.fill();
       ctx.restore();
       return;
     }
-    ctx.globalAlpha = alpha * .18;
-    const glow = ctx.createRadialGradient(field.x, field.y, 0, field.x, field.y, field.reach);
-    glow.addColorStop(0, color);
-    glow.addColorStop(1, 'transparent');
-    circle(ctx, field, field.reach);
-    ctx.fillStyle = glow;
-    ctx.fill();
 
-    const count = action === 'gravity' || action === 'chaos' || action === 'magnet' ? 5 : 3;
-    for (let i = 0; i < count; i++) {
-      ctx.globalAlpha = alpha * (.65 - i * .07);
-      ctx.lineWidth = (i === 0 ? 4.5 : 2.1) * (1 - progress * .35);
-      const radius = field.reach * (1 - i * .153);
-      if (action === 'glitch') {
-        ctx.strokeRect(field.x - radius, field.y - radius * .5, radius * 2, radius);
-      } else {
+    ctx.save();
+    ctx.translate(field.x, field.y);
+    ctx.globalAlpha *= alpha * .87;
+    if (technique === 'red' || technique === 'blue') {
+      const red = technique === 'red';
+      const core = Math.min(red ? 31 : 40, radius * .30);
+      const gradient = ctx.createRadialGradient(-core*.23, -core*.26, 1, 0, 0, core);
+      gradient.addColorStop(0, red ? '#fff7ed' : '#10142a');
+      gradient.addColorStop(.52, red ? '#ffabb4' : '#265dc2');
+      gradient.addColorStop(1, color);
+      circle(ctx, {x:0, y:0}, core);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      SkillInk.traced(ctx, color, 3.3);
+      for (const sign of [-1, 1]) {
+        const spin = cast.age * sign * 5.4;
         ctx.beginPath();
-        const start = cast.age * (i % 2 ? -4 : 4) + i;
-        ctx.arc(field.x, field.y, radius, start, start + (action === 'shock' ? TAU : Math.PI * 1.54));
-        ctx.stroke();
+        ctx.ellipse(0, 0, core * 1.87, core * .77, spin, sign * .68, sign * .68 + 3.83);
+        SkillInk.traced(ctx, color, 3.3);
       }
+      if (red) SkillInk.speed(ctx, {x:0,y:0}, cast.aim, core*2.65, core*.53, color, .81);
     }
-    if (action === 'glitch') {
-      ctx.globalAlpha = alpha * .82;
-      ctx.font = '900 19px Consolas, monospace';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#fff0f5';
-      ctx.fillText('PANEL BREAK', field.x - field.reach * .58, field.y - field.reach * .49);
+
+    const marks = action === 'guard' ? 6 : 8;
+    const drive = technique === 'blue' ? -1 : 1;
+    const rotation = cast.age * drive * (technique === 'blue' ? 2.1 : .59);
+    const lines = [];
+    for (let i = 0; i < marks; i++) {
+      const turn = i * TAU / marks + rotation;
+      const pad = radius * (action === 'guard' ? .13 : .20);
+      const b = offset({x:0,y:0}, turn, radius * .93);
+      const a = offset(b, turn - 2.26, pad);
+      const c = offset(b, turn + 2.26, pad);
+      if (technique === 'blue') {
+        const tip = offset(b, turn, -pad * 1.2);
+        lines.push([a, tip, c]);
+      } else lines.push([a,b,c]);
     }
+    SkillInk.line(ctx, lines, color, action === 'guard' ? 4.5 : 4.9, .79);
+    ctx.restore();
   }
 
-  function drawShot(ctx, shot, cast, radius) {
+  function drawShot(ctx, shot, cast, radius, spent = false) {
     const { technique } = cast;
     const direction = Math.atan2(shot.vy, shot.vx);
+    const spins = cast.action === 'ricochet' || technique === 'rasenshuriken';
     ctx.save();
     ctx.translate(shot.x, shot.y);
-    ctx.rotate(direction + (cast.action === 'ricochet' ? cast.age * 18 : 0));
-    ctx.fillStyle = shot.color;
-    ctx.strokeStyle = '#fff8ef';
-    ctx.lineWidth = 2.3;
+    ctx.rotate(direction + (spins ? cast.age * 18 : 0));
+    ctx.scale(radius, radius);
+    const color = shot.color;
+
     if (technique === 'shieldThrow') {
-      for (const [size, color] of [[1.43, '#e65763'], [1.12, '#d7e6ee'], [.87, '#df4b5e'], [.57, '#436897']]) {
-        circle(ctx, { x: 0, y: 0 }, radius * size);
-        ctx.fillStyle = color;
+      for (const [size, tint] of [[1.51,'#141421'],[1.36,'#cd4055'],[1.14,'#f1e6de'],[.86,'#e65365'],[.62,'#344d81']]) {
+        circle(ctx, { x: 0, y: 0 }, size);
+        ctx.fillStyle = tint;
         ctx.fill();
       }
-      ctx.stroke();
+      const star = Array.from({length:10}, (_,i) => {
+        const a = i * TAU / 10 - Math.PI / 2;
+        const d = i % 2 ? .23 : .48;
+        return [Math.cos(a)*d, Math.sin(a)*d];
+      });
+      SkillInk.polygon(ctx, star, '#fcf5eb', 0);
     } else if (technique === 'hammerThrow') {
-      ctx.fillStyle = '#c6d8eb';
-      ctx.fillRect(-radius, -radius * 1.15, radius * 1.3, radius * 1.3);
-      ctx.strokeRect(-radius, -radius * 1.15, radius * 1.3, radius * 1.3);
-      ctx.fillStyle = '#9c694f';
-      ctx.fillRect(-radius * .55, radius * .02, radius * .36, radius * 1.5);
-    } else if (technique === 'crescent') {
+      SkillInk.polygon(ctx, [[-.43,.10],[-.10,.11],[-.12,1.36],[-.38,1.40]], '#a77a52', .13);
+      SkillInk.polygon(ctx, [[-1.11,-.84],[.63,-.87],[.90,-.56],[.83,.35],[-.89,.35],[-1.12,.11]], '#849fbe', .16);
+      SkillInk.polygon(ctx, [[-.90,-.69],[.60,-.66],[.69,-.52],[-.86,-.48]], '#f3f4f2', 0);
+    } else if (technique === 'crescent' || technique === 'eclipse') {
       ctx.beginPath();
-      ctx.arc(0, 0, radius * 1.35, .05, Math.PI * 1.66);
-      ctx.quadraticCurveTo(-.44 * radius, .30 * radius, radius * 1.35, .05 * radius);
-      ctx.fill();
-      ctx.stroke();
-    } else if (['metalShards', 'thunderSpears', 'missile', 'frost'].includes(technique)) {
-      ctx.beginPath();
-      ctx.moveTo(radius * 1.55, 0);
-      ctx.lineTo(-radius * .83, -radius * .42);
-      ctx.lineTo(-radius * .46, radius * .46);
+      ctx.arc(0, 0, 1.47, .05, Math.PI * 1.66);
+      ctx.quadraticCurveTo(-.48, .44, 1.47, .05);
       ctx.closePath();
+      ctx.fillStyle = color;
       ctx.fill();
-      ctx.stroke();
+      SkillInk.traced(ctx, color, .15, '#fff3e3', .06);
+    } else if (['metalShards','thunderSpears','missile','frost'].includes(technique)) {
+      const spear = technique === 'thunderSpears' || technique === 'missile';
+      const point = spear ? 2.06 : 1.64;
+      SkillInk.polygon(ctx, [[point,0],[.26,-.45],[-1.23,-.39],[-1.46,.10],[-.48,.43],[.49,.38]], color, .14);
+      SkillInk.polygon(ctx, [[point*.86,-.005],[-.79,-.23],[-1.09,-.065],[.49,.15]], spear ? '#f4eadb' : '#edfbff', 0);
+      if (spear) SkillInk.polygon(ctx, [[-.45,-.35],[-.22,-.39],[-.19,.37],[-.43,.37]], '#695065', 0);
+    } else if (technique === 'divineFlame') {
+      SkillInk.polygon(ctx, [[2.49,0],[.32,-.64],[.53,-.27],[-1.43,-.77],[-.84,-.18],[-2.31,-.42],
+        [-1.58,.13],[-2.22,.64],[-.81,.31],[-1.14,.82],[.62,.46],[.37,.18]], '#ee664b', .18);
+      SkillInk.polygon(ctx, [[1.89,0],[.32,-.32],[-.84,-.27],[-.46,.03],[-1.03,.35],[.69,.27]], '#ffce84', 0);
+      SkillInk.polygon(ctx, [[1.46,0],[.47,-.16],[-.27,-.03],[.29,.16]], '#fff6c7', 0);
     } else if (technique === 'purple' || technique === 'chakraBomb') {
-      const size = radius * (technique === 'purple' ? 1.58 : 1.32);
-      const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, size);
-      glow.addColorStop(0, technique === 'purple' ? '#fff2ff' : '#211527');
-      glow.addColorStop(.58, technique === 'purple' ? '#b961f4' : '#3f2055');
-      glow.addColorStop(1, 'transparent');
+      const purple = technique === 'purple';
+      const size = purple ? 1.56 : 1.42;
+      const glow = ctx.createRadialGradient(-.35, -.36, .05, 0, 0, size);
+      glow.addColorStop(0, purple ? '#fcf4ff' : '#9c69bb');
+      glow.addColorStop(.48, purple ? '#bd6aef' : '#332040');
+      glow.addColorStop(1, '#22152e');
       circle(ctx, { x: 0, y: 0 }, size);
       ctx.fillStyle = glow;
-      ctx.fill();
-      ctx.rotate(cast.age * 9);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, size * .89, size * .69, 0, 0, TAU);
-      ctx.strokeStyle = '#ddbeff';
-      ctx.stroke();
-    } else if (technique === 'rasenshuriken') {
-      ctx.rotate(cast.age * 22);
-      ctx.beginPath();
-      for (let i = 0; i < 4; i++) {
-        const angle = i * Math.PI / 2;
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(angle) * radius * 1.9, Math.sin(angle) * radius * 1.9);
-        ctx.lineTo(Math.cos(angle + .54) * radius * .85, Math.sin(angle + .54) * radius * .85);
+      if (!spent) ctx.fill();
+      SkillInk.traced(ctx, color, .17, '#ecd9ff', .06);
+      for (const lane of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, size * 1.28, size * .61, cast.age * lane * 6, .30 * lane, .30 * lane + 3.57);
+        SkillInk.traced(ctx, purple ? '#d783ff' : '#c986de', .11, '#fff0ff', .045);
       }
+    } else if (technique === 'rasenshuriken') {
+      for (let i = 0; i < 4; i++) {
+        ctx.save();
+        ctx.rotate(i * Math.PI / 2);
+        SkillInk.polygon(ctx, [[0,0],[2.15,-.49],[1.68,.03],[.61,.58]], '#d6faff', .14);
+        SkillInk.polygon(ctx, [[.26,.09],[1.86,-.30],[1.35,.05],[.51,.38]], '#72cced', 0);
+        ctx.restore();
+      }
+      circle(ctx, { x: 0, y: 0 }, .51);
+      ctx.fillStyle = '#ccfaff';
       ctx.fill();
-      ctx.stroke();
-      circle(ctx, { x: 0, y: 0 }, radius * .38);
-      ctx.stroke();
+      SkillInk.traced(ctx, '#66d5f4', .14, '#fffaf0', .055);
     } else {
-      circle(ctx, { x: 0, y: 0 }, radius);
+      const base = ctx.createLinearGradient(-.9, .55, .84, -.35);
+      base.addColorStop(0, '#241d32');
+      base.addColorStop(.46, color);
+      base.addColorStop(1, '#fff4df');
+      ctx.beginPath();
+      ctx.moveTo(1.24, 0);
+      ctx.bezierCurveTo(.48,-.94,-.89,-.84,-1.38,-.04);
+      ctx.bezierCurveTo(-.75,.69,.25,1.02,1.24,0);
+      ctx.fillStyle = base;
       ctx.fill();
-      ctx.stroke();
+      SkillInk.traced(ctx, color, .15, '#fff3e5', .06);
     }
     ctx.restore();
   }
 
   function drawChain(ctx, cast, alpha) {
-    ctx.globalAlpha = alpha * .88;
-    ctx.strokeStyle = '#fff0c2';
-    ctx.lineWidth = 2.6;
+    ctx.save();
+    ctx.globalAlpha *= alpha;
     for (const path of cast.rays) {
       for (let index = 1; index < path.length; index++) {
         const from = path[index - 1];
         const to = path[index];
         const span = distance(from, to);
-        const count = Math.ceil(span / 16);
+        const count = Math.ceil(span / 19);
+        const direction = aim(from, to);
+        const scale = 1 + cast.form * .12 + cast.power * .07;
         for (let i = 0; i < count; i++) {
-          const point = offset(from, aim(from, to), span * (i + .5) / count);
+          const center = offset(from, direction, span * (i + .5) / count);
           ctx.beginPath();
-          ctx.ellipse(point.x, point.y, 9, i % 2 ? 3.4 : 5.7, aim(from, to), 0, TAU);
-          ctx.stroke();
+          ctx.ellipse(center.x, center.y, 11 * scale, (i % 2 ? 4.3 : 6.9) * scale, direction, 0, TAU);
+          SkillInk.traced(ctx, '#f6a34e', 4.5 * scale, '#ffefb5');
         }
+      }
+    }
+    ctx.restore();
+  }
+
+  function rayAtContact(path, hit) {
+    const [start, end] = path;
+    if (path.length !== 2) return path;
+    const length = distance(start, end);
+    if (length <= 1) return path;
+    const ux = (end.x - start.x) / length;
+    const uy = (end.y - start.y) / length;
+    const cx = hit.targetX - start.x;
+    const cy = hit.targetY - start.y;
+    const projection = cx * ux + cy * uy;
+    const perpendicular = Math.abs(cx * uy - cy * ux);
+    const radius = hit.targetRadius * .83;
+    if (perpendicular >= radius || projection <= 0 || projection >= length + radius) return path;
+    const contact = Math.max(12, projection - Math.sqrt(radius * radius - perpendicular * perpendicular));
+    return [start, { x: start.x + ux * contact, y: start.y + uy * contact }];
+  }
+
+  function drawRays(ctx, cast, progress, alpha) {
+    const { technique, color, lastContact } = cast;
+    const shorten = cast.action === 'beam' && lastContact && cast.age - lastContact.age < .27;
+    const rays = shorten ? cast.rays.map(path => rayAtContact(path, lastContact)) : cast.rays;
+    const mode = SkillInk.kind(technique);
+    if (technique === 'hellChain') {
+      drawChain(ctx, cast, alpha);
+      return;
+    }
+    if (technique === 'door') {
+      const tip = rays[0].at(-1);
+      drawField(ctx, { ...cast, technique: 'airCannon', field: { ...tip, reach: 68 + cast.form * 7 } }, progress, alpha);
+      return;
+    }
+    if (mode === 'blade' || mode === 'flame') {
+      const width = mode === 'blade' ? (technique === 'worldSlash' ? 15 : 6.4) + cast.form * .7 : 13 + cast.form * 2;
+      for (const path of rays) {
+        SkillInk.ribbon(ctx, path, width, color, alpha, mode === 'flame' ? '#ffe2a6' : '#fff3f8');
+        const tip = path.at(-1);
+        if (tip && path.length > 1) {
+          const direction = aim(path[0], tip);
+          SkillInk.speed(ctx, tip, direction, 37 + width * 2.4, width * .92, color, alpha * .64, 4);
+        }
+      }
+      return;
+    }
+    if (mode === 'web') {
+      SkillInk.line(ctx, rays, '#d5ecff', cast.power === 2 ? 7.5 : 5.2, alpha, '#ffffff');
+      for (const path of rays) {
+        for (let i = 2; i < path.length - 1; i += 3) {
+          const a = path[i];
+          const b = path[i + 1];
+          const angle = aim(a, b) + Math.PI / 2;
+          const width = 6 + cast.form * 1.4;
+          SkillInk.line(ctx, [[offset(a, angle, -width), offset(offset(a, angle, width), angle + Math.PI / 2, -8)]],
+            '#b5d2f5', 2.15, alpha * .76);
+        }
+      }
+      return;
+    }
+    const thin = mode === 'lightning' || mode === 'rope' || technique === 'smallLight';
+    const width = thin ? (mode === 'rope' ? 7.7 : 8.5) + cast.form : Math.min(43, 13 + cast.width * .42);
+    SkillInk.line(ctx, rays, color, width, alpha * .96, mode === 'rope' ? '#ffe8c5' : '#fffff2');
+    if (mode === 'charge' || mode === 'lightning') {
+      const main = rays[Math.floor(rays.length / 2)];
+      const tip = main?.at(-1);
+      if (tip && main.length > 1) {
+        SkillInk.speed(ctx, tip, aim(main[0], tip), width * 4.2, width * 1.10, color, alpha * .68, 5);
       }
     }
   }
 
+  function drawBackground(ctx, fighter, cast, progress, alpha) {
+    if (cast.comic) ComicSkills.draw(ctx, cast, alpha, true);
+    else if (cast.spectacle) ArenaUltimates.draw(ctx, fighter, cast, alpha, true);
+    else if (cast.field) drawField(ctx, cast, progress, alpha, true);
+  }
+
   function draw(ctx, fighter, cast, progress, alpha) {
+    if (cast.comic) {
+      ComicSkills.draw(ctx,cast,alpha);
+      return;
+    }
     if (cast.contact) {
       ContactSkills.draw(ctx, fighter, cast, progress, alpha);
       return;
@@ -491,22 +619,31 @@ const SignatureSkills = (() => {
 
     if (shots.has(cast.action)) {
       for (const node of cast.nodes) {
-        if (node.done) continue;
-        ctx.globalAlpha = alpha * .83;
-        ctx.strokeStyle = node.color;
-        const radius = 10 + cast.power * 3 + cast.form * 2;
-        const tail = { x: node.x - node.vx * .052, y: node.y - node.vy * .052 };
-        ctx.lineWidth = radius * .55;
-        strokePaths(ctx, [[tail, node]]);
+        const radius = 13 + cast.power * 4 + cast.form * 1.7;
+        if (node.done) {
+          if (['purple','divineFlame','chakraBomb','rasenshuriken'].includes(cast.technique) &&
+              Number.isFinite(node.hitAge) && cast.age - node.hitAge < .18) {
+            const fade = 1 - (cast.age - node.hitAge) / .18;
+            ctx.globalAlpha = alpha * (.44 + fade * .32) * fade;
+            const size = radius * (1.14 + (1 - fade) * .75);
+            if (cast.lastContact) ctx.translate(cast.lastContact.x - node.x, cast.lastContact.y - node.y);
+            drawShot(ctx, node, cast, size, true);
+            if (cast.lastContact) ctx.translate(node.x - cast.lastContact.x, node.y - cast.lastContact.y);
+          }
+          continue;
+        }
+        const direction = Math.atan2(node.vy, node.vx);
+        ctx.globalAlpha = alpha;
+        SkillInk.speed(ctx, {x:node.x - Math.cos(direction)*radius*.62, y:node.y - Math.sin(direction)*radius*.62},
+          direction, radius * 3.16, radius * .38, node.color, .64);
         drawShot(ctx, node, cast, radius);
       }
       return;
     }
 
     if (cast.anchor) {
-      ctx.globalAlpha = alpha * .53;
-      ctx.lineWidth = 2.7;
-      strokePaths(ctx, [curve(fighter, cast.anchor, 17)]);
+      ctx.globalAlpha = 1;
+      SkillInk.line(ctx, [curve(fighter, cast.anchor, 17)], cast.color, 3.8, alpha * .75);
       circle(ctx, cast.anchor, 8 + 2 * cast.form);
       ctx.stroke();
     }
@@ -528,37 +665,11 @@ const SignatureSkills = (() => {
       }
     }
     if (cast.rays.length && cast.action !== 'clone') {
-      if (cast.technique === 'cursedSlash') {
-        ctx.globalAlpha = alpha * .9;
-        ctx.strokeStyle = '#fff1f4';
-        ctx.lineWidth = 2.7 + cast.form * .4;
-        strokePaths(ctx, cast.rays);
-        return;
-      }
-      if (cast.technique === 'hellChain') {
-        drawChain(ctx, cast, alpha);
-        return;
-      }
-      if (cast.technique === 'door') {
-        const tip = cast.rays[0].at(-1);
-        drawField(ctx, { ...cast, technique: 'airCannon', field: { ...tip, reach: 68 + cast.form * 7 } }, progress, alpha);
-        return;
-      }
-      const thin = ['web', 'widowBite', 'smallLight'].includes(cast.technique);
-      ctx.globalAlpha = alpha * .23;
-      ctx.lineWidth = cast.width * (thin ? .48 : 1);
-      strokePaths(ctx, cast.rays);
-      ctx.globalAlpha = alpha * .83;
-      ctx.lineWidth *= .47;
-      strokePaths(ctx, cast.rays);
-      ctx.strokeStyle = '#fff2ed';
-      ctx.globalAlpha = alpha * .67;
-      ctx.lineWidth = thin ? 1.4 : 2.5;
-      strokePaths(ctx, cast.rays);
+      drawRays(ctx, cast, progress, alpha);
     }
     for (const node of cast.nodes) {
       if (cast.action === 'clone') {
-        ctx.globalAlpha = alpha * .37;
+        ctx.globalAlpha = alpha * (cast.technique === 'ninjaClone' ? .70 : .52);
         FighterPortraits.draw(ctx, fighter.char.id, node.x, node.y, fighter.radius * .63,
           { form: cast.form, pose: 'attack', wind: 0, color: cast.color, time: cast.age, compact: true });
       } else {
@@ -571,5 +682,5 @@ const SignatureSkills = (() => {
     }
   }
 
-  return { release, advance, draw };
+  return { release, advance, drawBackground, draw };
 })();

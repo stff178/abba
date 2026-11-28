@@ -3,201 +3,201 @@
 const CharacterMoves = (() => {
   // Each row is the tactical attack, close/support follow-up and ultimate for one form.
   const kits = {
-    hulk: [
-      ['Heavy Hook/punch', 'Shoulder Charge/bodyRush', 'Hulk Smash/stomp'],
-      ['Ground Pound/stomp', 'Rage Uppercut/punch', 'Seismic Landing/bodyRush'],
-      ['Gladiator Hook/punch', 'Arena Grapple/grapple', 'Gladiator Slam/stomp'],
-      ['Warbound Charge/bodyRush', 'Double-Fist Smash/punch', 'World War Pummel/punch'],
-      ['Gamma Knuckle/punch', 'Faultline Stomp/stomp', 'World Breaker Smash/stomp']
-    ],
     spider_man: [
-      ['Web Shot/web', 'Swing Kick/webKick', 'Web Swing Takedown/webKick'],
-      ['Anchor Swing/web', 'Acrobatic Kick/webKick', 'Web Cocoon/web'],
-      ['Iron Spider Legs/claws', 'Wrist Web/web', 'Iron Spider Takedown/claws'],
-      ['Symbiote Web/web', 'Tendril Slam/tether', 'Symbiote Cocoon/tether'],
-      ['Cosmic Web/web', 'Wall Swing Kick/webKick', 'Infinite Spider Web/webArena']
+      ['Web Shot/web', 'Wall Swing/webSwing', 'Web Sling Takedown/webSwing'],
+      ['Organic Web/web', 'Symbiote Lash/tether', 'Black Web Cocoon/web'],
+      ['Iron Arm Pin/ironArms', 'Wrist Web/web', 'Iron Spider Pincer/ironArms'],
+      ['Wrist Stinger/stinger', 'Totem Silk/web', 'Stinger and Silk/stinger'],
+      ['Star Web/web', 'Cosmic Sling/webSwing', 'Infinite Spider Web/webArena']
     ],
     ironman: [
-      ['Palm Repulsor/repulsor', 'Boot-Thruster Rush/bodyRush', 'Chest Unibeam/unibeam'],
-      ['Twin Repulsors/repulsor', 'Shoulder Micro-Missiles/missile', 'Repulsor Crossfire/repulsor'],
-      ['Repulsor Flight Pass/repulsor', 'Armor Module Guard/guard', 'Modular Repulsor Array/ironArmor'],
-      ['Nanotech Blade/sword', 'Nanotech Shield/guard', 'Nanotech Unibeam/unibeam'],
-      ['Godkiller Repulsor/repulsor', 'Armor Wing Rush/bodyRush', 'Iron Legion Crossfire/ironArmor']
+      ['Palm Repulsor/repulsor', 'Armor Ram/bodyRush', 'Chest Unibeam/unibeam'],
+      ['Shoulder Micro-Missiles/missile', 'Twin Palm Repulsors/repulsor', 'Two-Palm Repulsor Burst/twinRepulsor'],
+      ['Armor Assembly/guard', 'Repulsor Pass/repulsor', 'Iron Legion Crossfire/ironArmor'],
+      ['Nano Blade/nanoBlade', 'Nano Shield/guard', 'Nanotech Unibeam/unibeam'],
+      ['Mark 85 Twin Repulsors/twinRepulsor', 'Nano Blade/nanoBlade', 'Nano Gauntlet Snap/snap']
     ],
     wolverine: [
-      ['Adamantium Swipe/claws', 'Feral Lunge/claws', 'Adamantium Crosscut/claws'],
-      ['Weapon X Cut/claws', 'Shoulder Rake/claws', 'Weapon X Breakout/claws'],
-      ['Berserker Pounce/claws', 'Rising Claw/claws', 'Berserker Triple Cut/claws'],
-      ['Adamantium Counter/claws', 'Raking Rush/claws', 'Berserker Close-Quarters/claws'],
-      ['Immortal Crosscut/claws', 'Feral Grapple/grapple', 'Immortal Berserker Barrage/claws']
+      ['Claw Swipe/claws', 'Feral Lunge/claws', 'Adamantium Crosscut/claws'],
+      ['Containment Break/claws', 'Reverse Claw Counter/claws', 'Weapon X Breakout/claws'],
+      ['Feral Crosscut/claws', 'Berserker Grapple/grapple', 'Berserker Barrage/claws'],
+      ['Heated Claw Swipe/hotClaws', 'Rising Claws/hotClaws', 'Red-Hot Crosscut/hotClaws'],
+      ['Healing Factor/regeneration', 'Adamantium Hook/claws', 'Last Stand Barrage/claws']
     ],
     deadpool: [
-      ['Katana Cross/sword', 'Acrobatic Kick/kick', 'Twin Katana Flourish/sword'],
-      ['X-Force Katana Dash/sword', 'Short-Range Counter/kick', 'X-Force Crosscut/sword'],
-      ['Spinning Katana/sword', 'Recovering Guard/guard', 'Mercenary Blade Rush/sword'],
-      ['Symbiote Grip/tether', 'Symbiote Katana/sword', 'Venompool Double Cut/sword'],
-      ['Katana Feint/sword', 'Comic-Panel Kick/kick', 'Merc’s Encore/sword']
+      ['Katana Cross/dualBlades', 'Quickdraw/trickShot', 'Twin Katana Flourish/dualBlades'],
+      ['X-Force Quickdraw/trickShot', 'Gray Katana Feint/dualBlades', 'X-Force Counterstrike/dualBlades'],
+      ['Healing Factor/regeneration', 'Returning Counter/dualBlades', 'Back-on-My-Feet Encore/dualBlades'],
+      ['Symbiote Lash/tether', 'Symbiote Katana/dualBlades', 'Venompool Double Cut/dualBlades'],
+      ['Comic Panel Rip/panel', 'Katana Feint/dualBlades', 'Fourth Wall Slash/panel']
     ],
     captain_america: [
       ['Shield Throw/shieldThrow', 'Shield Bash/shieldBash', 'Vibranium Ricochet/shieldThrow'],
-      ['Banking Shield Throw/shieldThrow', 'Cover Behind Shield/guard', 'Shield Return Combo/shieldBash'],
-      ['Vibranium Intercept/guard', 'Shield Counter/shieldBash', 'Vibranium Countercharge/shieldBash'],
-      ['Worthy Shield Bash/shieldBash', 'Mjolnir Throw/hammerThrow', 'Worthy Thunder/lightning'],
-      ['Sentinel Shield Throw/shieldThrow', 'Shield Rush/shieldBash', 'Sentinel Ricochet/shieldThrow']
+      ['Shield Cover/shieldGuard', 'Shield Counter/shieldBash', 'Captain’s Tactical Ricochet/shieldThrow'],
+      ['Energy Shield/shieldGuard', 'Energy Shield Edge/shieldBash', 'Kinetic Shield Pulse/kinetic'],
+      ['Mjolnir Throw/hammerThrow', 'Worthy Shield Counter/shieldBash', 'Worthy Thunder/lightning'],
+      ['Sentinel Shield Throw/shieldThrow', 'Gauntlet Guard/shieldGuard', 'Infinity Gauntlet Push/powerStone']
     ],
     thor: [
       ['Mjolnir Throw/hammerThrow', 'Mjolnir Strike/hammer', 'Mjolnir Thunder/lightning'],
-      ['Lightning Call/lightning', 'Returning Hammer/hammerThrow', 'Thunder Cross/lightning'],
-      ['Stormbreaker Slash/hammer', 'Stormbreaker Throw/hammerThrow', 'Stormbreaker Descent/hammer'],
-      ['Rune Lightning/lightning', 'God of Thunder Hammer/hammer', 'Rune Thunderstorm/lightning'],
-      ['Cosmic Stormbreaker/hammer', 'Stormbreaker Return/hammerThrow', 'Ragnarok Lightning/lightning']
+      ['Odinforce Lightning/lightning', 'Hammer Recall/hammerThrow', 'Odinforce Storm/lightning'],
+      ['Stormbreaker Swing/hammer', 'Stormbreaker Throw/hammerThrow', 'Stormbreaker Bifrost Descent/bifrost'],
+      ['Mjolnir Recall/hammerThrow', 'Twin Weapon Clash/dualHammer', 'Mjolnir and Stormbreaker/dualHammer'],
+      ['King Thor Hammer/hammer', 'Skyfather Thunder/lightning', 'All-Father’s Storm/lightning']
+    ],
+    hulk: [
+      ['Heavy Hook/punch', 'Shoulder Charge/bodyRush', 'Hulk Smash/stomp'],
+      ['Body Hook/punch', 'Counter Grapple/grapple', 'Gray Hulk Uppercut/uppercut'],
+      ['Arena Grapple/grapple', 'Gladiator Hammer/hammer', 'Sakaar Hammer Slam/hammer'],
+      ['Warbound Shoulder/bodyRush', 'Double-Fist Smash/punch', 'Worldbreaker Faultline/stomp'],
+      ['Immortal Hook/punch', 'Gamma Recovery/regeneration', 'Immortal Hulk Smash/stomp']
     ],
     doctor_strange: [
-      ['Crimson Bands of Cyttorak/tether', 'Mystic Shield/guard', 'Crimson Bands Circle/tether'],
-      ['Sling Ring Gate/portal', 'Mystic Binding/tether', 'Twin Sling Ring Gates/portal'],
-      ['Mirror Gate/portal', 'Images of Ikonn/illusion', 'Mirror Dimension Fold/portal'],
-      ['Crimson Bands Weave/tether', 'Mystic Ward/guard', 'Images of Ikonn Formation/illusion'],
-      ['Multiverse Gate/portal', 'Ring of Binding/tether', 'Mirror Dimension Array/portal']
+      ['Crimson Bands/mysticBands', 'Mystic Shield/guard', 'Crimson Bands of Cyttorak/mysticBands'],
+      ['Eye of Agamotto/guard', 'Astral Double/illusion', 'Astral Projection/illusion'],
+      ['Sling Ring Gate/portal', 'Images of Ikonn/illusion', 'Mirror Dimension Fold/mirror'],
+      ['Time Loop/timeStone', 'Ring of Binding/mysticBands', 'Eye of Agamotto Reversal/timeStone'],
+      ['Multiverse Gate/portal', 'Mirror Shards/mirror', 'Multiverse Mirror Array/mirror']
     ],
     scarlet_witch: [
-      ['Chaos Bolt/hexBolt', 'Warding Hex/guard', 'Scarlet Hex Burst/chaos'],
-      ['Scarlet Hex/chaos', 'Chaos Bolt Pair/hexBolt', 'Hex Circle/chaos'],
-      ['Seeking Chaos Bolt/hexBolt', 'Reality Hex/chaos', 'Chaos Magic Convergence/chaos'],
-      ['Probability Hex/chaos', 'Scarlet Barrier/guard', 'Reality Rewritten/chaos'],
-      ['House of M Hex/chaos', 'Scarlet Chaos Volley/hexBolt', 'House of M Reality/chaos']
+      ['Hex Bolt/hexBolt', 'Warding Hex/guard', 'Hex Probability Burst/chaos'],
+      ['Telekinetic Pull/telekinesis', 'Chaos Bolt Pair/hexBolt', 'Telekinetic Crush/telekinesis'],
+      ['Chaos Sigil/chaos', 'Scarlet Barrier/guard', 'Chaos Magic Convergence/chaos'],
+      ['Reality Fold/reality', 'Seeking Hex/hexBolt', 'Reality Rewritten/reality'],
+      ['Scarlet Reality/reality', 'Possibility Shift/chaos', 'House of M Hex/reality']
     ],
     thanos: [
       ['Titan Punch/punch', 'Titan Grapple/grapple', 'Titan Overpower/stomp'],
-      ['Power Stone Wave/powerStone', 'Titan Smash/stomp', 'Power Stone Release/powerStone'],
-      ['Space Stone Gate/portal', 'Reality Stone Warp/chaos', 'Space and Reality Fold/portal'],
-      ['Mind Stone Pressure/chaos', 'Time Stone Slow/timeStone', 'Time Stone Reversal/timeStone'],
-      ['Infinity Gauntlet Bolt/stones', 'Space Stone Rift/portal', 'Infinity Stones Convergence/stones']
+      ['Power Stone Pulse/powerStone', 'Titan Fist/punch', 'Power Stone Release/powerStone'],
+      ['Space Stone Gate/portal', 'Reality Stone Shift/reality', 'Space and Reality Fold/reality'],
+      ['Time Stone Slow/timeStone', 'Mind Stone Pulse/telekinesis', 'Time Stone Reversal/timeStone'],
+      ['Stone Volley/stones', 'Space Stone Rift/portal', 'Infinity Snap/snap']
     ],
     black_panther: [
-      ['Vibranium Claws/claws', 'Panther Pounce/kick', 'Panther Claw Takedown/claws'],
-      ['Kinetic Storage/guard', 'Charged Claw/claws', 'Vibranium Kinetic Discharge/kinetic'],
-      ['Golden Vibranium Claw/claws', 'Panther Counter/kick', 'Golden Panther Rush/claws'],
-      ['Ancestral Prowl/claws', 'Vibranium Guard/guard', 'Ancestral Kinetic Burst/kinetic'],
-      ['Claws of Bast/claws', 'Vibranium Pounce/kick', 'Avatar of Bast Kinetic Release/kinetic']
+      ['Vibranium Claws/claws', 'Panther Rush/bodyRush', 'Panther Claw Takedown/claws'],
+      ['Kinetic Storage/guard', 'Charged Claw/claws', 'Vibranium Kinetic Pulse/kinetic'],
+      ['Herb-Boosted Claw/claws', 'Panther Counter/bodyRush', 'Ancestral Pounce/claws'],
+      ['Ancestral Guard/guard', 'Legacy Claw Chain/claws', 'Ancestral Kinetic Burst/kinetic'],
+      ['Bast’s Claws/claws', 'Ancestor Echo/ancestor', 'Ancestral Procession/ancestor']
     ],
     loki: [
-      ['Illusion Feint/illusion', 'Asgardian Dagger/sword', 'Hall of Mischief/illusion'],
-      ['Frost Spell/frost', 'Frost Giant Dagger/sword', 'Frost Giant Illusion/frost'],
-      ['Double Illusion/illusion', 'Vanishing Blade/sword', 'Illusion Court/illusion'],
-      ['Timeline Gate/portal', 'Decoy Dagger/sword', 'Temporal Decoy/illusion'],
-      ['Yggdrasil Illusion/illusion', 'Timeline Step/portal', 'Yggdrasil Mirror Legion/illusion']
+      ['Illusion Feint/illusion', 'Asgardian Dagger/daggers', 'Hall of Mischief/illusion'],
+      ['Jotunn Ice Shards/frost', 'Frost Dagger/daggers', 'Jotunn Ice Fan/frost'],
+      ['Double Illusion/illusion', 'Vanishing Blade/daggers', 'Illusion Court/illusion'],
+      ['Time Slip/portal', 'Temporal Decoy/illusion', 'Timeline Loop/timeStone'],
+      ['Timeline Thread/thread', 'Timeline Gate/portal', 'Yggdrasil Weave/thread']
     ],
     venom: [
-      ['Symbiote Lash/tether', 'Venom Pounce/grapple', 'Symbiote Takedown/tether'],
-      ['Double Tendril/tether', 'Symbiote Slam/stomp', 'Tendril Swarm/tether'],
-      ['Symbiote Snare/tether', 'Brutal Grapple/grapple', 'Symbiote Grasp/tether'],
-      ['Symbiote Wing Dive/bodyRush', 'Winged Tendril/tether', 'Black Wings Takedown/grapple'],
-      ['King in Black Tendrils/tether', 'Symbiote Crush/stomp', 'Symbiote World Grasp/tether']
+      ['Symbiote Lash/tether', 'Venom Grapple/grapple', 'Symbiote Capture/tether'],
+      ['Heavy Symbiote Punch/punch', 'Symbiote Slam/stomp', 'Symbiote Body Crush/grapple'],
+      ['Swarm Lash/tendrils', 'Symbiote Snare/tether', 'Tendril Swarm/tendrils'],
+      ['Black Wing Rush/bodyRush', 'Winged Tendril/tether', 'Black Wings Dive/bodyRush'],
+      ['Hive Tendrils/tendrils', 'Symbiote Slam/stomp', 'Symbiote World Grasp/tendrils']
     ],
     doctor_doom: [
-      ['Doom Armor Ray/beam', 'Armor Force Field/guard', 'Doom Arc Discharge/beam'],
-      ['Doombot Patrol/doomBots', 'Armored Gauntlet/punch', 'Doombot Crossfire/doomBots'],
-      ['Latverian Sigil/chaos', 'Mystic Ward/guard', 'Doom Sorcery Circle/chaos'],
-      ['Cosmic Armor Ray/beam', 'Cosmic Ward/guard', 'Cosmic Doom Discharge/beam'],
-      ['Battleworld Doombots/doomBots', 'God Emperor Ward/guard', 'Battleworld Doombot Array/doomBots']
+      ['Armor Ray/beam', 'Armor Force Field/guard', 'Gauntlet Discharge/beam'],
+      ['Doombot Patrol/doomBots', 'Armored Fist/punch', 'Doombot Crossfire/doomBots'],
+      ['Mystic Ward/guard', 'Sorcery Portal/portal', 'Doom Sorcery Circle/chaos'],
+      ['Power Cosmic Ray/cosmicRay', 'Cosmic Ward/guard', 'Cosmic Doom Discharge/cosmicRay'],
+      ['Battleworld Rift/reality', 'God Emperor Ward/guard', 'Battleworld Rewrite/reality']
     ],
     ghost_rider: [
-      ['Hellfire Chain/hellChain', 'Hellfire Trail/flame', 'Hellfire Chain Swing/hellChain'],
-      ['Flaming Chain Hook/hellChain', 'Hellfire Charge/flame', 'Spirit’s Chain Snare/hellChain'],
-      ['Blue Hellfire/flame', 'Blue Chain/hellChain', 'Blue Flame Circuit/flame'],
-      ['Vengeance Chain/hellChain', 'Judgment Glare/penance', 'Penance Stare/penance'],
-      ['Cosmic Hellfire Trail/flame', 'Cosmic Chain/hellChain', 'Hellfire Chain Arena/hellChain']
+      ['Hellfire Chain/hellChain', 'Hellfire Trail/flame', 'Chain Lasso/hellChain'],
+      ['Flaming Chain Hook/hellChain', 'Hellfire Rider Charge/bodyRush', 'Hellfire Circuit/flame'],
+      ['Hellfire Fan/flame', 'Flaming Chain Return/hellChain', 'Hellfire Breath/hellBreath'],
+      ['Chain Restraint/hellChain', 'Judgment Glare/penance', 'Penance Stare/penance'],
+      ['Hellfire Sweep/flame', 'Zarathos Chain/hellChain', 'Zarathos Chain Arena/hellChain']
     ],
     black_widow: [
-      ['Widow’s Bite/widowBite', 'Baton Sweep/baton', 'Widow Baton Counter/baton'],
-      ['Tactical Baton/baton', 'Widow’s Bite Pair/widowBite', 'Widow Slide Takedown/kick'],
-      ['Stealth Takedown/kick', 'Baton Counter/baton', 'Widow’s Bite Overload/widowBite'],
-      ['Widow’s Bite Circuit/widowBite', 'Twin Batons/baton', 'Twin Baton Rush/baton'],
-      ['Red Room Baton/baton', 'Red Room Counter/kick', 'Red Room Takedown/baton']
+      ['Widow’s Bite/widowBite', 'Baton Sweep/baton', 'Bite and Baton/baton'],
+      ['Tactical Batons/baton', 'Widow’s Bite Pair/widowBite', 'Tactical Baton Counter/baton'],
+      ['Stealth Feint/guard', 'Baton Counter/baton', 'Close-Quarters Takedown/grapple'],
+      ['Widow’s Bite Circuit/widowBite', 'Twin Batons/baton', 'Widow’s Bite Overload/widowBite'],
+      ['Red Room Baton/baton', 'Widow’s Bite Trap/widowBite', 'Red Room Counterstrike/baton']
     ],
     magneto: [
       ['Metal Shards/metalShards', 'Magnetic Deflection/magnet', 'Metal Barrage/metalShards'],
-      ['Magnetic Metal Ring/magnet', 'Shrapnel Fan/metalShards', 'Metal Storm/metalShards'],
-      ['Magnetic Shield/guard', 'Polarity Pull/magnet', 'White Magneto Shrapnel/metalShards'],
+      ['Magnetic Force Field/guard', 'Magnetic Shrapnel/metalShards', 'Metal Orbit Trap/magnet'],
+      ['Polarity Pull/magnet', 'Floating Shard Fan/metalShards', 'Magnetic Lift/magnet'],
       ['Omega Polarity/magnet', 'Metal Crossfire/metalShards', 'Omega Magnetic Field/magnet'],
-      ['Magnetic Collapse/magnet', 'Magnetic Shrapnel/metalShards', 'Magnetic Sovereign Field/magnet']
+      ['Magnetic Shield/guard', 'Magnetic Shrapnel/metalShards', 'Geomagnetic Collapse/reversal']
     ],
     captain_marvel: [
       ['Photon Blast/photon', 'Flight Punch/bodyRush', 'Photon Impact/photon'],
-      ['Photon Salvo/photon', 'Aerial Dash/bodyRush', 'Photon Overload/photon'],
-      ['Energy Absorption/guard', 'Photon Return/photon', 'Absorbed Energy Release/photon'],
-      ['Binary Flight Strike/bodyRush', 'Binary Photon Bolt/photon', 'Binary Photon Burst/nova'],
-      ['Cosmic Photon Blast/photon', 'Stellar Charge/bodyRush', 'Binary Stellar Core/nova']
+      ['Energy Absorption/absorb', 'Photon Return/photon', 'Absorbed Energy Release/photon'],
+      ['Warbird Counter/punch', 'Aerial Charge/bodyRush', 'Warbird Flight Strike/bodyRush'],
+      ['Binary Flight Strike/bodyRush', 'Twin Photon Bolts/twinPhoton', 'Binary Photon Burst/nova'],
+      ['Cosmic Photon Blast/photon', 'Stellar Rush/bodyRush', 'Binary Stellar Core/nova']
     ],
     moon_knight: [
-      ['Crescent Dart/crescent', 'Crescent Blade/sword', 'Crescent Ricochet/crescent'],
-      ['Mr. Knight Baton/baton', 'Mr. Knight Counter/kick', 'Mr. Knight Baton Flurry/baton'],
-      ['Lunar Crescent Darts/crescent', 'Crescent Blade Rush/sword', 'Lunar Crescent Sweep/crescent'],
-      ['Khonshu Crescent/crescent', 'Lunar Blade/sword', 'Fist of Khonshu Assault/sword'],
-      ['Eclipse Crescent Volley/crescent', 'Moon Blade Rush/sword', 'Eclipse Crescent Storm/crescent']
+      ['Crescent Dart/crescent', 'Crescent Blade/moonBlade', 'Crescent Ricochet/crescent'],
+      ['Baton Cross/baton', 'Mr. Knight Guard/guard', 'Mr. Knight Baton Flurry/baton'],
+      ['Lunar Crescent/crescent', 'Lunar Guard/guard', 'Lunar Crescent Sweep/moonBlade'],
+      ['Khonshu Crescent/crescent', 'Lunar Blade/moonBlade', 'Fist of Khonshu Assault/moonBlade'],
+      ['Eclipse Crescent/crescent', 'Moon Blade Rush/moonBlade', 'Eclipse Crescent Storm/eclipse']
     ],
     silver_surfer: [
       ['Power Cosmic Ray/cosmicRay', 'Board Sweep/boardRush', 'Silver Cosmic Burst/cosmicRay'],
-      ['Charged Cosmic Ray/cosmicRay', 'Cosmic Skim/boardRush', 'Cosmic Board Break/boardRush'],
-      ['Cosmic Orbit/orbit', 'Silver Ray/cosmicRay', 'Power Cosmic Convergence/nova'],
-      ['Silver Surfer Black Ray/cosmicRay', 'Dark Cosmic Field/gravity', 'Dark Matter Well/gravity'],
+      ['Cosmic Charge/guard', 'Board Skim/boardRush', 'Charged Power Cosmic/cosmicRay'],
+      ['Cosmic Orbit/orbit', 'Cosmic Ray/cosmicRay', 'Power Cosmic Convergence/nova'],
+      ['Dark Matter Well/gravity', 'Black Board Pass/boardRush', 'Dark Cosmic Pulse/cosmicRay'],
       ['Galactic Power Cosmic/cosmicRay', 'Cosmic Board Dive/boardRush', 'Cosmic Singularity/gravity']
     ],
     gojo: [
-      ['Cursed Technique Lapse: Blue/blue', 'Infinity/guard', 'Hollow Purple/purple'],
-      ['Six Eyes Blue/blue', 'Cursed Technique Reversal: Red/red', 'Maximum Output Blue/blue'],
-      ['Limitless Red/red', 'Lapse: Blue Pull/blue', 'Unlimited Void/void'],
-      ['Maximum Output Red/red', 'Blue Singularity/blue', 'Maximum Output Hollow Purple/purple'],
-      ['Limitless Blue and Red/purple', 'Unlimited Void/void', 'Unrestricted Hollow Purple/purple']
+      ['Limitless Infinity/guard', 'Cursed Technique Lapse: Blue/blue', 'Six Eyes: Blue Pull/blue'],
+      ['Blue Pull/blue', 'Lapse Counter/punch', 'Maximum Output Blue/blue'],
+      ['Reversal: Red/red', 'Infinity Guard/guard', 'Maximum Output Red/red'],
+      ['Blue and Red Setup/red', 'Lapse: Blue/blue', '200% Hollow Purple/purple'],
+      ['Hollow Technique: Purple/purple', 'Limitless Guard/guard', 'Domain Expansion: Unlimited Void/void']
     ],
     sukuna: [
-      ['Dismantle/cursedSlash', 'Cleave/claws', 'Malevolent Shrine/shrine'],
-      ['Dismantle Cross/cursedSlash', 'Cleave Counter/claws', 'Shrine: Grid of Slashes/shrine'],
-      ['Dismantle Lattice/cursedSlash', 'Cleave at Close Range/claws', 'Malevolent Shrine Barrage/shrine'],
-      ['Dismantle Line/cursedSlash', 'Cleave Rupture/claws', 'World-Cutting Dismantle/cursedSlash'],
-      ['World-Cutting Slash/cursedSlash', 'Cleave Crosscut/claws', 'Malevolent Shrine: Open Domain/shrine']
+      ['Dismantle/cursedSlash', 'Cleave/cleave', 'Malevolent Shrine/shrine'],
+      ['Dismantle Cross/cursedSlash', 'Cleave Counter/cleave', 'Divine Flame: Open/divineFlame'],
+      ['Divine Dog/tenShadows', 'Nue Lightning/lightning', 'Mahoraga: Ten Shadows/tenShadows'],
+      ['Cleave Palm/cleave', 'Dismantle Sign/cursedSlash', 'World-Cutting Slash/worldSlash'],
+      ['World-Cutting Dismantle/worldSlash', 'Cleave Crosscut/cleave', 'Open Domain: Malevolent Shrine/shrine']
     ],
     naruto: [
       ['Shadow Clone Jutsu/ninjaClone', 'Rasengan/rasengan', 'Multi Shadow Clone Combo/ninjaClone'],
-      ['Shadow Clone Rasengan/rasengan', 'Chakra Arm/tether', 'Giant Rasengan/rasengan'],
-      ['Nine-Tails Chakra Arm/tether', 'Rasengan Rush/rasengan', 'Tailed Beast Bomb/chakraBomb'],
-      ['Sage Rasenshuriken/rasenshuriken', 'Shadow Clone Assault/ninjaClone', 'Six Paths: Rasenshuriken/rasenshuriken'],
-      ['Kurama Chakra Arm/tether', 'Tailed Beast Bomb/chakraBomb', 'Tailed Beast Rasenshuriken/rasenshuriken']
+      ['Frog Kata/punch', 'Sage Rasengan/rasengan', 'Wind Style: Rasenshuriken/rasenshuriken'],
+      ['Kurama Chakra Arm/tether', 'Chakra Rasengan/rasengan', 'Tailed Beast Bomb/chakraBomb'],
+      ['Truth-Seeking Orbs/orbit', 'Shadow Clone Assault/ninjaClone', 'Six Paths Rasenshuriken/rasenshuriken'],
+      ['Baryon Counter/baryon', 'Baryon Palm/baryon', 'Baryon Close-Quarters Barrage/baryon']
     ],
     luffy: [
-      ['Gum-Gum Pistol/elastic', 'Gum-Gum Whip/elastic', 'Gum-Gum Gatling/elasticFlurry'],
-      ['Gear 2: Jet Pistol/elastic', 'Jet Stamp/elastic', 'Gear 2: Jet Gatling/elasticFlurry'],
-      ['Gear 4: Kong Gun/elastic', 'Python/elastic', 'Gear 4: King Kong Gun/dawnFists'],
-      ['Gear 5: Dawn Whip/elastic', 'Gum-Gum Giant/elastic', 'Gear 5: Bajrang Gun/dawnFists'],
-      ['Dawn Monkey Pistol/elastic', 'Dawn Gatling/elasticFlurry', 'Dawn Monkey: Bajrang Gun/dawnFists']
+      ['Gum-Gum Pistol/elastic', 'Gum-Gum Bell/elastic', 'Gum-Gum Gatling/elasticFlurry'],
+      ['Jet Pistol/elastic', 'Jet Bullet/elastic', 'Jet Gatling/elasticFlurry'],
+      ['Gigant Pistol/giantFist', 'Gigant Rifle/elastic', 'Gigant Elephant Gun/dawnFists'],
+      ['Kong Gun/elastic', 'Python/elastic', 'King Kong Gun/dawnFists'],
+      ['Dawn Rocket/elastic', 'Dawn Gatling/elasticFlurry', 'Gear 5: Bajrang Gun/dawnFists']
     ],
     eren: [
-      ['Cadet ODM Blade/odm', 'Twin Blade Counter/sword', 'Scout Assault/odm'],
-      ['Attack Titan Hook/punch', 'Titan Grapple/grapple', 'Attack Titan Takedown/stomp'],
-      ['Titan Heavy Fist/punch', 'Hardened Knuckles/punch', 'Attack Titan Ground Smash/stomp'],
-      ['War Hammer Floor Spikes/warHammer', 'Hardened Strike/punch', 'War Hammer Spike Field/warHammer'],
-      ['Founding Titan Sovereign Step/stomp', 'Titan Advance/titanMarch', 'Founding Titan: The Rumbling/titanMarch']
+      ['Cadet ODM Blade/odm', 'Twin Blade Counter/dualBlades', 'Scout Assault/odm'],
+      ['Attack Titan Hook/punch', 'Titan Grapple/grapple', 'Attack Titan Ground Smash/stomp'],
+      ['Hardened Knuckles/crystalPunch', 'Coordinate Call/coordinate', 'Hardened Titan Pummel/crystalPunch'],
+      ['War Hammer Floor Spikes/warHammer', 'Crystal Guard/guard', 'War Hammer Spike Field/warHammer'],
+      ['Founding Titan Command/coordinate', 'Titan Advance/titanMarch', 'Founding Titan: The Rumbling/titanMarch']
     ],
     levi: [
-      ['ODM Blade Rush/odm', 'Twin Blade Slash/sword', 'Ackerman Spinning Cut/odm'],
-      ['Grapple Slash/odm', 'Reverse-Grip Cut/sword', 'ODM Crosscut/odm'],
-      ['Ackerman Twin Blades/sword', 'Grapple Feint/odm', 'Ackerman High-Speed Duel/odm'],
+      ['Reverse-Grip Knife/reverseBlade', 'Quick Counter/reverseBlade', 'Underground Knife Flurry/reverseBlade'],
+      ['ODM Blade Rush/odm', 'Twin Blade Slash/dualBlades', 'Ackerman Spinning Cut/odm'],
+      ['Ackerman Cut/dualBlades', 'Grapple Feint/odm', 'Ackerman High-Speed Duel/odm'],
       ['Thunder Spear Volley/thunderSpears', 'Reverse Blade Flurry/odm', 'Thunder Spear Barrage/thunderSpears'],
-      ['Ackerman Blade Charge/odm', 'Thunder Spear Pass/thunderSpears', 'Ackerman Dual Blade Rush/odm']
+      ['Ackerman Blade Charge/odm', 'Thunder Spear Pass/thunderSpears', 'Beast Titan Pursuit/odm']
     ],
     doraemon: [
       ['Air Cannon/airCannon', 'Small Light/smallLight', 'Air Cannon Gust/airCannon'],
       ['Take-copter Dive/copter', 'Air Cannon Puff/airCannon', 'Take-copter Air Cannon/airCannon'],
-      ['Small Light Sweep/smallLight', 'Air Cannon Burst/airCannon', 'Small Light and Air Cannon/smallLight'],
+      ['Small Light Sweep/smallLight', 'Air Cannon Burst/airCannon', 'Small Light Double Sweep/smallLight'],
       ['Anywhere Door Escape/door', 'Air Cannon Counter/airCannon', 'Anywhere Door Surprise/door'],
-      ['Anywhere Door Step/door', 'Small Light Assist/smallLight', 'Anywhere Door Air Cannon/door']
+      ['Time Cloth Cover/timeCloth', 'Small Light Assist/smallLight', 'Time Cloth Rewind/timeCloth']
     ],
     frieren: [
-      ['Zoltraak/zoltraak', 'Defensive Magic/guard', 'Zoltraak Barrage/zoltraak'],
-      ['Hexagonal Defense/guard', 'Zoltraak Pierce/zoltraak', 'Zoltraak Array/zoltraak'],
-      ['Judgment Light: Catastravia/zoltraak', 'Binding Magic/tether', 'Catastravia: Judgment Light/nova'],
-      ['Vollzanbel Fire Magic/flame', 'Layered Defense/guard', 'Vollzanbel Flame Wave/flame'],
-      ['Zoltraak Crossfire/zoltraak', 'Hexagonal Ward/guard', 'Grand Zoltraak Barrage/zoltraak']
+      ['Defensive Magic/guard', 'Binding Magic/mysticBands', 'Focused Zoltraak/zoltraak'],
+      ['Zoltraak Pierce/zoltraak', 'Hexagonal Defense/guard', 'Zoltraak Array/zoltraak'],
+      ['Judradjim Lightning/judradjim', 'Vollzanbel Fire/flame', 'Vollzanbel Flame Wave/flame'],
+      ['Barrier Analysis/guard', 'Dispel Magic/dispel', 'Barrier-Breaking Spell/dispel'],
+      ['Zoltraak Crossfire/zoltraak', 'Binding Ward/mysticBands', 'Grand Zoltraak Barrage/zoltraak']
     ]
   };
 
@@ -210,11 +210,20 @@ const CharacterMoves = (() => {
     rasenshuriken: 'volley', elasticFlurry: 'dawnFists', hellChain: 'tether', penance: 'chaos',
     thunderSpears: 'volley', airCannon: 'shock', smallLight: 'beam', door: 'portal',
     zoltraak: 'beam', kinetic: 'guard', metalShards: 'volley', widowBite: 'beam',
-    warHammer: 'stomp', copter: 'kick'
+    warHammer: 'stomp', copter: 'rush', webSwing: 'bodyRush', ironArms: 'claws', stinger: 'claws',
+    twinRepulsor: 'beam', twinPhoton: 'beam', nanoBlade: 'sword', hotClaws: 'claws', uppercut: 'punch',
+    dualBlades: 'sword', moonBlade: 'sword', reverseBlade: 'sword', daggers: 'sword', trickShot: 'volley',
+    shieldGuard: 'guard', regeneration: 'guard', absorb: 'guard', bifrost: 'hammer', dualHammer: 'hammer',
+    mysticBands: 'tether', mirror: 'portal', reality: 'chaos', telekinesis: 'gravity', tendrils: 'tether',
+    thread: 'tether', ancestor: 'clone', hellBreath: 'flame', reversal: 'magnet', eclipse: 'volley',
+    cleave: 'claws', worldSlash: 'beam', baryon: 'punch', crystalPunch: 'punch', coordinate: 'titanMarch',
+    tenShadows: 'shadowSummon', divineFlame: 'volley', giantFist: 'dawnFists', timeCloth: 'cloth',
+    dispel: 'dispel', judradjim: 'lightning', snap: 'snap', panel: 'panel'
   };
 
   const close = new Set(['punch', 'stomp', 'bodyRush', 'grapple', 'claws', 'sword', 'shieldBash',
-    'hammer', 'kick', 'webKick', 'rasengan', 'odm', 'baton', 'boardRush', 'warHammer', 'copter']);
+    'hammer', 'kick', 'webKick', 'rasengan', 'odm', 'baton', 'boardRush', 'warHammer', 'copter', 'webSwing', 'ironArms', 'stinger', 'nanoBlade', 'hotClaws', 'uppercut',
+    'dualBlades', 'moonBlade', 'reverseBlade', 'daggers', 'dualHammer', 'cleave', 'baryon', 'crystalPunch']);
 
   function get(id, form, slot) {
     const index = slot === 'ultimate' ? 2 : slot === 'skill2' ? 1 : 0;
