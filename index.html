@@ -71,6 +71,17 @@
       transform: translateX(24px);
     }
 
+    @media (max-width: 760px) {
+      #creator-panel {
+        top: auto;
+        right: 8px;
+        bottom: 8px;
+        left: 8px;
+        width: auto;
+        max-height: min(39dvh, 320px);
+      }
+    }
+
     /* Floating Show UI Button (appears right where the panel hides) */
     #btn-show-ui {
       position: fixed;
@@ -91,6 +102,14 @@
       pointer-events: none;
       transform: translateX(12px);
       transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    @media (max-width: 760px) {
+      #btn-show-ui {
+        top: auto;
+        right: 8px;
+        bottom: 8px;
+      }
     }
 
     #btn-show-ui.visible {
@@ -192,7 +211,7 @@
       50% { filter: brightness(1.28); }
     }
 
-    input[type="text"], select {
+    input[type="text"], input[type="number"], select {
       width: 100%;
       padding: 6px 8px;
       border-radius: 7px;
@@ -203,7 +222,7 @@
       outline: none;
     }
 
-    input[type="text"]:focus, select:focus {
+    input[type="text"]:focus, input[type="number"]:focus, select:focus {
       border-color: #00f3ff;
     }
 
@@ -307,10 +326,10 @@
       color: #7c85a6;
     }
 
-    input[type="range"] {
-      width: 100%;
-      accent-color: #00f3ff;
-      cursor: pointer;
+    .match-settings {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+      gap: 8px;
     }
 
     .panel-footer {
@@ -356,9 +375,24 @@
     <div class="timer-box">
       <div>
         <div style="font-size:10px; color:#9da6c2; text-transform:uppercase;">Match Timer</div>
-        <div style="font-size:10px; color:#7f89ab;">Sweet spot: 50s – 60s</div>
+        <div style="font-size:10px; color:#7f89ab;">Elapsed / Limit</div>
       </div>
-      <div id="ui-timer" class="timer-value">00:00.0</div>
+      <div id="ui-timer" class="timer-value">00:00.0 / 01:00.0</div>
+    </div>
+
+    <div class="match-settings">
+      <div class="control-group">
+        <label for="input-duration">Thời lượng (giây)</label>
+        <input id="input-duration" type="number" value="60" min="1" step="0.1" required />
+      </div>
+      <div class="control-group">
+        <label for="select-winner">Bên thắng</label>
+        <select id="select-winner">
+          <option value="auto">Tự động theo HP</option>
+          <option value="0">Bên trái</option>
+          <option value="1">Bên phải</option>
+        </select>
+      </div>
     </div>
 
     <div class="control-row">
@@ -405,14 +439,6 @@
       <input id="input-seed" type="text" value="7772026" placeholder="Enter seed..." />
     </div>
 
-    <div class="control-group">
-      <label for="slider-speed">
-        <span>Game Speed</span>
-        <span id="label-speed" style="color:#fff;">1.0x</span>
-      </label>
-      <input id="slider-speed" type="range" min="0.5" max="2.5" step="0.25" value="1" />
-    </div>
-
     <div class="panel-footer">
       <b>Hotkeys:</b> <code>H</code> Hide/Show UI • <code>Space</code> Play/Pause • <code>R</code> Restart
     </div>
@@ -422,6 +448,21 @@
 
   <div id="toast">Creator Panel hidden — Press H to show</div>
 
+  <script src="src/characters/fighter-roster.js"></script>
+  <script src="src/characters/marvel-portraits.js"></script>
+  <script src="src/characters/final-portraits.js"></script>
+  <script src="src/characters/portraits.js"></script>
+  <script src="src/arena/arena-effects.js"></script>
+  <script src="src/combat/transformations.js"></script>
+  <script src="src/animation/fighter-animator.js"></script>
+  <script src="src/animation/transformation-scene.js"></script>
+  <script src="src/combat/match-damage.js"></script>
+  <script src="src/skills/ultimate-moves.js"></script>
+  <script src="src/animation/ultimate-animator.js"></script>
+  <script src="src/skills/contact-skills.js"></script>
+  <script src="src/skills/arena-ultimates.js"></script>
+  <script src="src/skills/signature-skills.js"></script>
+  <script src="src/skills/skill-timeline.js"></script>
   <script>
     (() => {
       'use strict';
@@ -433,11 +474,15 @@
       const CANVAS_H = 1920;
       const ARENA_CX = CANVAS_W / 2;
       const ARENA_CY = 1095;
-      const ARENA_INITIAL_RADIUS = 450;
-      const ARENA_MIN_RADIUS = 195;
-      const SHRINK_START_TIME = 22.0;    // Vòng bo thu hẹp sau 22 giây (nhịp đấu 50s - 60s)
-      const OVERDRIVE_START_TIME = 44.0; // Nhân đôi sát thương sau 44 giây để kết liễu kịch tính
-      const ARENA_SHRINK_RATE = 5.8;     // px/giây
+      const ARENA_RADIUS = 450;
+      const DEFAULT_DURATION = 60;
+
+      function formatClock(seconds) {
+        const total = Math.round(seconds * 10);
+        const mins = Math.floor(total / 600);
+        const secs = ((total % 600) / 10).toFixed(1).padStart(4, '0');
+        return String(mins).padStart(2, '0') + ':' + secs;
+      }
 
       const canvas = document.getElementById('arena-canvas');
       const ctx = canvas.getContext('2d');
@@ -565,8 +610,6 @@
           this.critChance = config.critChance || 0.18;
           this.critMult = config.critMult || 1.5;
           this.radius = config.radius || 62;
-          this.skill1Cd = config.skill1Cd || 6.0;
-          this.skill2Cd = config.skill2Cd || 5.5;
           this.skills = config.skills || {};
           this.drawFallbackAvatar = config.drawFallbackAvatar;
           this.drawCustomEffects = config.drawCustomEffects;
@@ -611,8 +654,6 @@
         critChance: 0.16,
         critMult: 1.5,
         radius: 62,
-        skill1Cd: 7.8,
-        skill2Cd: 7.5,
         skills: {
           // NỘI TẠI: Vô Hạ Hạn (Limitless Barrier) — Chặn 100% 1 đòn đánh, hồi lại sau 9 giây
           passive(self, target, arena, eventType, payload) {
@@ -677,107 +718,41 @@
 
           // CHIÊU 3 (ULTIMATE): Hư thức: Tử (Hollow Purple) — Tụ 0.5s rồi bắn quả cầu tím hủy diệt xuyên sàn
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'HOLLOW PURPLE!', '#c77dff');
             arena.showFighterSkill(self, '[HOLLOW PURPLE!]', '#c77dff');
-            self.castFreeze = 0.5;
-            self.pendingUlt = {
-              delay: 0.5,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                self.bleedStacks = [];
-                self.domainSlowTimer = 0;
-                arena.domainEffect = null;
+            self.bleedStacks = [];
+            self.domainSlowTimer = 0;
+            arena.domainEffect = null;
 
-                arena.projectiles.push({
-                  type: 'hollow_purple',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 30),
-                  y: self.y + uy * (self.radius + 30),
-                  vx: ux * 1050,
-                  vy: uy * 1050,
-                  radius: 76,
-                  color: '#c77dff',
-                  damage: 9.2,
-                  hit: false,
-                  life: 2.2
-                });
+            arena.projectiles.push({
+              type: 'hollow_purple',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 30),
+              y: self.y + uy * (self.radius + 30),
+              vx: ux * 1050,
+              vy: uy * 1050,
+              radius: 76,
+              color: '#c77dff',
+              damage: 9.2,
+              hit: false,
+              life: 2.2
+            });
 
-                SoundFX.redBlast();
-                arena.addShake(24);
-                arena.triggerFlash('#b517ff', 0.3);
-                arena.spawnRing(self.x, self.y, 30, 240, '#c77dff', 0.5);
-                arena.spawnParticles(self.x, self.y, '#c77dff', 44, 620);
-              }
-            };
+            SoundFX.redBlast();
+            arena.addShake(24);
+            arena.triggerFlash('#b517ff', 0.3);
+            arena.spawnRing(self.x, self.y, 30, 240, '#c77dff', 0.5);
+            arena.spawnParticles(self.x, self.y, '#c77dff', 44, 620);
           }
         },
 
-        // Fallback Canvas Art: Tóc nhọn trắng vuốt lên + Bịt mắt đen + Six Eyes phát sáng
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          // Nền da & bóng ánh sáng xanh
-          const faceGrad = c.createRadialGradient(x, y + r * 0.15, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#fff5ec');
-          faceGrad.addColorStop(0.65, '#e8d5c8');
-          faceGrad.addColorStop(1, '#98b4c9');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          // Clip bên trong hình tròn
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tóc nhọn trắng vuốt dựng phía trên
-          c.fillStyle = '#f8fbff';
-          c.beginPath();
-          c.moveTo(x - r, y - r * 0.12);
-          c.lineTo(x - r * 0.72, y - r * 0.78);
-          c.lineTo(x - r * 0.45, y - r * 0.45);
-          c.lineTo(x - r * 0.22, y - r * 0.96);
-          c.lineTo(x, y - r * 0.52);
-          c.lineTo(x + r * 0.24, y - r * 0.98);
-          c.lineTo(x + r * 0.48, y - r * 0.46);
-          c.lineTo(x + r * 0.76, y - r * 0.8);
-          c.lineTo(x + r, y - r * 0.12);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Dải bịt mắt đen đặc trưng của Gojo
-          c.fillStyle = '#0c0d14';
-          c.fillRect(x - r, y - r * 0.22, r * 2, r * 0.42);
-
-          // Đôi mắt Six Eyes rực sáng xanh neon (sáng gấp đôi khi Awakening)
-          c.shadowColor = '#00f3ff';
-          c.shadowBlur = isAwakened ? 24 : 12;
-          c.fillStyle = isAwakened ? '#ffffff' : '#7ef9ff';
-          c.beginPath();
-          c.ellipse(x - r * 0.3, y - r * 0.01, r * 0.19, r * (isAwakened ? 0.11 : 0.08), 0, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.3, y - r * 0.01, r * 0.19, r * (isAwakened ? 0.11 : 0.08), 0, 0, Math.PI * 2);
-          c.fill();
-
-          // Nụ cười tự tin đặc trưng
-          c.shadowBlur = 0;
-          c.strokeStyle = '#1b1d28';
-          c.lineWidth = Math.max(2.5, r * 0.06);
-          c.lineCap = 'round';
-          c.beginPath();
-          c.arc(x, y + r * 0.34, r * 0.22, 0.15 * Math.PI, 0.85 * Math.PI);
-          c.stroke();
-
-          c.restore();
-        },
 
         // Vẽ Khiên Lục Giác Vô Hạ Hạn (Hexagonal Limitless Barrier)
         drawCustomEffects(c, self, time) {
@@ -808,8 +783,9 @@
           }
 
           // Hiệu ứng tụ 2 quả cầu Xanh + Đỏ khi đang charge Hollow Purple
-          if (self.castFreeze > 0) {
-            const p = 1 - self.castFreeze / 0.5;
+          const cast = self.skillCast;
+          if (cast?.slot === 'ultimate' && cast.age < cast.charge) {
+            const p = cast.age / cast.charge;
             const sep = (1 - p) * 58;
             c.save();
             c.shadowBlur = 24;
@@ -843,8 +819,6 @@
         critChance: 0.18,
         critMult: 1.5,
         radius: 62,
-        skill1Cd: 7.4,
-        skill2Cd: 7.5,
         skills: {
           // NỘI TẠI: Vua Lời Nguyền — Mọi đòn đánh gây Bleed 0.8% Max HP/giây trong 3s (cộng dồn tối đa 3 lần)
           passive(self, target, arena, eventType, payload) {
@@ -853,7 +827,7 @@
             }
           },
 
-          // CHIÊU 1: Bát (Dismantle) — Khi nảy tường, bắn 3 tia chém gió bay chéo sàn đấu
+          // CHIÊU 1: Bát (Dismantle) — Bắn 3 tia chém gió bay chéo sàn đấu
           skill1(self, target, arena) {
             SoundFX.slash();
             const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
@@ -894,7 +868,6 @@
 
           // CHIÊU 3 (ULTIMATE): Bành trướng Lãnh địa — Phục Ma Ngự Thai Tử (Malevolent Shrine)
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'DOMAIN EXPANSION!', '#ff003c');
             arena.showFighterSkill(self, '[MALEVOLENT SHRINE!]', '#ff003c');
 
@@ -908,84 +881,6 @@
             };
             target.domainSlowTimer = 3.0;
           }
-        },
-
-        // Fallback Canvas Art: Tóc hồng dựng + Hoa văn ấn chú đen + 4 mắt đỏ phát sáng
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.15, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#ffe8dc');
-          faceGrad.addColorStop(0.65, '#e2b9aa');
-          faceGrad.addColorStop(1, '#7a2232');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tóc hồng dựng đặc trưng của Sukuna
-          c.fillStyle = '#ff6b8b';
-          c.beginPath();
-          c.moveTo(x - r, y - r * 0.16);
-          c.lineTo(x - r * 0.72, y - r * 0.86);
-          c.lineTo(x - r * 0.42, y - r * 0.48);
-          c.lineTo(x - r * 0.15, y - r * 0.96);
-          c.lineTo(x + r * 0.12, y - r * 0.48);
-          c.lineTo(x + r * 0.42, y - r * 0.94);
-          c.lineTo(x + r * 0.74, y - r * 0.5);
-          c.lineTo(x + r, y - r * 0.16);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Hoa văn ấn chú đen trên trán, sống mũi và má
-          c.strokeStyle = '#0e070b';
-          c.lineWidth = Math.max(3, r * 0.085);
-          c.lineCap = 'round';
-          c.beginPath();
-          // Ấn chú trán
-          c.moveTo(x - r * 0.34, y - r * 0.42);
-          c.lineTo(x + r * 0.34, y - r * 0.42);
-          // Vạch sống mũi
-          c.moveTo(x - r * 0.15, y + r * 0.06);
-          c.lineTo(x + r * 0.15, y + r * 0.06);
-          // Vạch má hai bên
-          c.moveTo(x - r * 0.68, y + r * 0.24);
-          c.lineTo(x - r * 0.38, y + r * 0.24);
-          c.moveTo(x + r * 0.38, y + r * 0.24);
-          c.lineTo(x + r * 0.68, y + r * 0.24);
-          c.stroke();
-
-          // 4 Đôi mắt đỏ rực (2 mắt trên + 2 mắt dưới đặc trưng của Sukuna)
-          c.shadowColor = '#ff003c';
-          c.shadowBlur = isAwakened ? 22 : 10;
-          c.fillStyle = isAwakened ? '#ffea00' : '#ff1e42';
-
-          // Mắt chính (trên)
-          c.beginPath();
-          c.ellipse(x - r * 0.32, y - r * 0.1, r * 0.15, r * 0.075, 0.18, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.32, y - r * 0.1, r * 0.15, r * 0.075, -0.18, 0, Math.PI * 2);
-          c.fill();
-
-          // Mắt phụ (dưới)
-          c.beginPath();
-          c.ellipse(x - r * 0.32, y + r * 0.1, r * 0.11, r * 0.055, 0.12, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.32, y + r * 0.1, r * 0.11, r * 0.055, -0.12, 0, Math.PI * 2);
-          c.fill();
-
-          // Nụ cười tà ác
-          c.shadowBlur = 0;
-          c.strokeStyle = '#18060c';
-          c.lineWidth = Math.max(2.5, r * 0.065);
-          c.beginPath();
-          c.arc(x, y + r * 0.36, r * 0.26, 0.1 * Math.PI, 0.9 * Math.PI);
-          c.stroke();
-
-          c.restore();
         },
 
         drawCustomEffects(c, self, time) {
@@ -1020,8 +915,6 @@
         critChance: 0.17,
         critMult: 1.5,
         radius: 62,
-        skill1Cd: 7.4,
-        skill2Cd: 7.2,
         skills: {
           // NỘI TẠI: Hồi phục Cửu Vĩ (Kurama Regeneration) — Hồi 0.55 HP/s (1.1 HP/s khi Awakening)
           passive(self, target, arena, eventType, payload) {
@@ -1080,112 +973,35 @@
 
           // CHIÊU 3 (ULTIMATE): Bom Vĩ Thú (Tailed Beast Bomb / Bijuu Dama)
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'TAILED BEAST BOMB!', '#ff6d00');
             arena.showFighterSkill(self, '[TAILED BEAST BOMB!]', '#ff6d00');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'bijuu_dama',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 34),
-                  y: self.y + uy * (self.radius + 34),
-                  vx: ux * 980,
-                  vy: uy * 980,
-                  radius: 74,
-                  color: '#ff5400',
-                  damage: 9.5,
-                  hit: false,
-                  life: 2.2
-                });
+            arena.projectiles.push({
+              type: 'bijuu_dama',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 34),
+              y: self.y + uy * (self.radius + 34),
+              vx: ux * 980,
+              vy: uy * 980,
+              radius: 74,
+              color: '#ff5400',
+              damage: 9.5,
+              hit: false,
+              life: 2.2
+            });
 
-                SoundFX.redBlast();
-                arena.addShake(26);
-                arena.triggerFlash('#ff6d00', 0.32);
-                arena.spawnRing(self.x, self.y, 28, 250, '#ff6d00', 0.5);
-                arena.spawnParticles(self.x, self.y, '#ff9100', 44, 620);
-              }
-            };
+            SoundFX.redBlast();
+            arena.addShake(26);
+            arena.triggerFlash('#ff6d00', 0.32);
+            arena.spawnRing(self.x, self.y, 28, 250, '#ff6d00', 0.5);
+            arena.spawnParticles(self.x, self.y, '#ff9100', 44, 620);
           }
-        },
-
-        // Fallback Canvas Art: Tóc vàng dựng + Băng trán Konoha + 3 vệt râu mèo + Mắt xanh/Cửu Vĩ
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.12, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, isAwakened ? '#ffe0b2' : '#fff0db');
-          faceGrad.addColorStop(0.68, isAwakened ? '#ffb74d' : '#e8c49e');
-          faceGrad.addColorStop(1, '#c46d1f');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tóc vàng nhọn dựng
-          c.fillStyle = isAwakened ? '#fff176' : '#ffd60a';
-          c.beginPath();
-          c.moveTo(x - r, y - r * 0.25);
-          c.lineTo(x - r * 0.72, y - r * 0.88);
-          c.lineTo(x - r * 0.42, y - r * 0.54);
-          c.lineTo(x - r * 0.14, y - r * 0.98);
-          c.lineTo(x + r * 0.12, y - r * 0.52);
-          c.lineTo(x + r * 0.42, y - r * 0.96);
-          c.lineTo(x + r * 0.72, y - r * 0.55);
-          c.lineTo(x + r, y - r * 0.25);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Băng trán Konoha màu xanh đen + miếng kim loại xám
-          c.fillStyle = '#1b263b';
-          c.fillRect(x - r, y - r * 0.48, r * 2, r * 0.24);
-          c.fillStyle = '#adb5bd';
-          c.fillRect(x - r * 0.36, y - r * 0.45, r * 0.72, r * 0.18);
-
-          // Đôi mắt xanh dương (chuyển sang mắt Cửu Vĩ đỏ cam khi Awakening)
-          c.shadowColor = isAwakened ? '#ff3d00' : '#00b4ff';
-          c.shadowBlur = isAwakened ? 18 : 8;
-          c.fillStyle = isAwakened ? '#ff3d00' : '#00b4ff';
-          c.beginPath();
-          c.ellipse(x - r * 0.3, y - r * 0.04, r * 0.15, r * 0.1, 0, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.3, y - r * 0.04, r * 0.15, r * 0.1, 0, 0, Math.PI * 2);
-          c.fill();
-
-          // 3 vệt râu mèo mỗi bên má
-          c.shadowBlur = 0;
-          c.strokeStyle = '#3d251e';
-          c.lineWidth = Math.max(2.2, r * 0.055);
-          c.lineCap = 'round';
-          for (const dy of [0.14, 0.24, 0.34]) {
-            c.beginPath();
-            c.moveTo(x - r * 0.68, y + r * dy);
-            c.lineTo(x - r * 0.38, y + r * (dy - 0.02));
-            c.moveTo(x + r * 0.38, y + r * (dy - 0.02));
-            c.lineTo(x + r * 0.68, y + r * dy);
-            c.stroke();
-          }
-
-          // Nụ cười tự tin
-          c.strokeStyle = '#221510';
-          c.lineWidth = Math.max(2.5, r * 0.06);
-          c.beginPath();
-          c.arc(x, y + r * 0.36, r * 0.22, 0.12 * Math.PI, 0.88 * Math.PI);
-          c.stroke();
-          c.restore();
         },
 
         drawCustomEffects(c, self, time) {
@@ -1220,8 +1036,6 @@
         critChance: 0.18,
         critMult: 1.55,
         radius: 62,
-        skill1Cd: 7.2,
-        skill2Cd: 7.4,
         skills: {
           passive(self, target, arena, eventType, payload) {
             if (eventType === 'onTakeDamage') {
@@ -1234,23 +1048,7 @@
 
           skill1(self, target, arena) {
             SoundFX.slash();
-            const ang = Math.atan2(target.y - self.y, target.x - self.x);
-            arena.projectiles.push({
-              type: 'jet_pistol',
-              owner: self,
-              target,
-              x: self.x + Math.cos(ang) * (self.radius + 18),
-              y: self.y + Math.sin(ang) * (self.radius + 18),
-              vx: Math.cos(ang) * 1120,
-              vy: Math.sin(ang) * 1120,
-              angle: ang,
-              radius: 34,
-              color: '#ff3b30',
-              damage: 3.1,
-              hit: false,
-              life: 1.3
-            });
-            arena.showFighterSkill(self, '[JET PISTOL!]', '#ff595e');
+            arena.spawnParticles(self.x, self.y, '#ff9e7c', 7, 180);
           },
 
           skill2(self, target, arena, hitInfo) {
@@ -1265,117 +1063,35 @@
           },
 
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'GEAR 5: BAJRANG GUN!', '#ffffff');
             arena.showFighterSkill(self, '[GEAR 5: BAJRANG GUN!]', '#ffffff');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'bajrang_gun',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 36),
-                  y: self.y + uy * (self.radius + 36),
-                  vx: ux * 960,
-                  vy: uy * 960,
-                  radius: 82,
-                  color: '#ffffff',
-                  damage: 9.8,
-                  hit: false,
-                  life: 2.2
-                });
+            arena.projectiles.push({
+              type: 'bajrang_gun',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 36),
+              y: self.y + uy * (self.radius + 36),
+              vx: ux * 960,
+              vy: uy * 960,
+              radius: 82,
+              color: '#ffffff',
+              damage: 9.8,
+              hit: false,
+              life: 2.2
+            });
 
-                SoundFX.redBlast();
-                arena.addShake(28);
-                arena.triggerFlash('#ffffff', 0.36);
-                arena.spawnRing(self.x, self.y, 26, 260, '#ffffff', 0.5);
-                arena.spawnParticles(self.x, self.y, '#ffffff', 46, 640);
-              }
-            };
+            SoundFX.redBlast();
+            arena.addShake(28);
+            arena.triggerFlash('#ffffff', 0.36);
+            arena.spawnRing(self.x, self.y, 26, 260, '#ffffff', 0.5);
+            arena.spawnParticles(self.x, self.y, '#ffffff', 46, 640);
           }
-        },
-
-        // Fallback Canvas Art: Mũ rơm vàng + Ruy băng đỏ + Vết sẹo dưới mắt trái + Nụ cười Gear 5
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.15, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#fff3e2');
-          faceGrad.addColorStop(0.68, '#e8c4a0');
-          faceGrad.addColorStop(1, isAwakened ? '#d8e2ff' : '#9e382e');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Mũ rơm vàng đặc trưng (hoặc tóc mây trắng bồng bềnh khi Gear 5 Awakening)
-          if (isAwakened) {
-            c.fillStyle = '#ffffff';
-            c.shadowColor = '#ffffff';
-            c.shadowBlur = 14;
-            for (const [ox, oy, cr] of [[-0.55, -0.58, 0.42], [0, -0.72, 0.48], [0.55, -0.58, 0.42]]) {
-              c.beginPath();
-              c.arc(x + r * ox, y + r * oy, r * cr, 0, Math.PI * 2);
-              c.fill();
-            }
-            c.shadowBlur = 0;
-          } else {
-            // Chỏm mũ rơm vàng
-            c.fillStyle = '#f4c430';
-            c.fillRect(x - r, y - r * 1.1, r * 2, r * 0.72);
-            // Dải ruy băng đỏ quanh mũ
-            c.fillStyle = '#d90429';
-            c.fillRect(x - r, y - r * 0.46, r * 2, r * 0.14);
-            // Tóc đen lòa xòa dưới vành mũ
-            c.fillStyle = '#141418';
-            c.beginPath();
-            c.moveTo(x - r, y - r * 0.32);
-            c.lineTo(x - r * 0.45, y - r * 0.14);
-            c.lineTo(x, y - r * 0.28);
-            c.lineTo(x + r * 0.45, y - r * 0.14);
-            c.lineTo(x + r, y - r * 0.32);
-            c.lineTo(x + r, y - r * 0.36);
-            c.lineTo(x - r, y - r * 0.36);
-            c.closePath();
-            c.fill();
-          }
-
-          // Đôi mắt to tròn (ánh đỏ/trắng rực khi Gear 5)
-          c.fillStyle = isAwakened ? '#ff2a55' : '#111116';
-          c.beginPath();
-          c.arc(x - r * 0.28, y - r * 0.02, r * 0.1, 0, Math.PI * 2);
-          c.arc(x + r * 0.28, y - r * 0.02, r * 0.1, 0, Math.PI * 2);
-          c.fill();
-
-          // Vết sẹo khâu đặc trưng dưới mắt trái
-          c.strokeStyle = '#5c1a1b';
-          c.lineWidth = Math.max(2, r * 0.05);
-          c.beginPath();
-          c.moveTo(x - r * 0.42, y + r * 0.14);
-          c.lineTo(x - r * 0.16, y + r * 0.14);
-          c.stroke();
-
-          // Nụ cười răng trắng toe toét đặc trưng của Luffy
-          c.fillStyle = '#ffffff';
-          c.strokeStyle = '#1b1414';
-          c.lineWidth = Math.max(2.5, r * 0.055);
-          c.beginPath();
-          c.arc(x, y + r * 0.3, r * 0.34, 0.08 * Math.PI, 0.92 * Math.PI);
-          c.closePath();
-          c.fill();
-          c.stroke();
-          c.restore();
         },
 
         drawCustomEffects(c, self, time) {
@@ -1409,8 +1125,6 @@
         critChance: 0.18,
         critMult: 1.55,
         radius: 62,
-        skill1Cd: 7.4,
-        skill2Cd: 7.3,
         skills: {
           // NỘI TẠI: Tái Tạo Titan (Titan Regeneration) — Hồi lại 20% sát thương vừa nhận & tăng dame khi mất máu
           passive(self, target, arena, eventType, payload) {
@@ -1437,7 +1151,7 @@
             }
           },
 
-          // CHIÊU 1: Cọc Gai Búa Chiến (Warhammer Spikes) — Bắn 3 mũi gai pha lê xuyên giáp khi nảy tường
+          // CHIÊU 1: Cọc Gai Búa Chiến (Warhammer Spikes) — Bắn 3 mũi gai pha lê xuyên giáp
           skill1(self, target, arena) {
             SoundFX.slash();
             const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
@@ -1476,100 +1190,34 @@
 
           // CHIÊU 3 (ULTIMATE): Rung Chấn (The Rumbling) — Triệu hồi làn sóng Titan Khổng Lồ càn quét
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'THE RUMBLING!', '#e63946');
             arena.showFighterSkill(self, '[THE RUMBLING!]', '#e63946');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'rumbling_wave',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 32),
-                  y: self.y + uy * (self.radius + 32),
-                  vx: ux * 880,
-                  vy: uy * 880,
-                  radius: 84,
-                  color: '#e63946',
-                  damage: 9.6,
-                  hit: false,
-                  life: 2.3
-                });
-                target.addBleedStack(self, target.maxHp * 0.01, 3.0, 2);
-                SoundFX.redBlast();
-                arena.addShake(28);
-                arena.triggerFlash('#e63946', 0.34);
-                arena.spawnRing(self.x, self.y, 28, 270, '#e63946', 0.55);
-              }
-            };
+            arena.projectiles.push({
+              type: 'rumbling_wave',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 32),
+              y: self.y + uy * (self.radius + 32),
+              vx: ux * 880,
+              vy: uy * 880,
+              radius: 84,
+              color: '#e63946',
+              damage: 9.6,
+              hit: false,
+              life: 2.3
+            });
+            target.addBleedStack(self, target.maxHp * 0.01, 3.0, 2);
+            SoundFX.redBlast();
+            arena.addShake(28);
+            arena.triggerFlash('#e63946', 0.34);
+            arena.spawnRing(self.x, self.y, 28, 270, '#e63946', 0.55);
           }
-        },
-
-        // Fallback Canvas Art: Tóc nâu dài rẽ ngôi S4 + Mắt xanh ngọc Titan + Vết sẹo Titan dưới mắt
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.14, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#fff1e6');
-          faceGrad.addColorStop(0.7, '#d9b8a3');
-          faceGrad.addColorStop(1, '#4a2c2a');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tóc nâu đậm rẽ ngôi dài ôm 2 bên má
-          c.fillStyle = '#2b1d1a';
-          c.beginPath();
-          c.moveTo(x - r, y + r * 0.4);
-          c.lineTo(x - r * 0.72, y - r * 0.25);
-          c.lineTo(x, y - r * 0.58);
-          c.lineTo(x + r * 0.72, y - r * 0.25);
-          c.lineTo(x + r, y + r * 0.4);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Đôi mắt xanh ngọc bích phát sáng
-          c.shadowColor = isAwakened ? '#00ffaa' : '#2ec4b6';
-          c.shadowBlur = isAwakened ? 22 : 12;
-          c.fillStyle = isAwakened ? '#64ffda' : '#2ec4b6';
-          c.beginPath();
-          c.ellipse(x - r * 0.28, y - r * 0.04, r * 0.15, r * 0.085, 0.1, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.28, y - r * 0.04, r * 0.15, r * 0.085, -0.1, 0, Math.PI * 2);
-          c.fill();
-
-          // Vết sẹo Titan kẻ dọc dưới mắt
-          c.shadowBlur = 0;
-          c.strokeStyle = '#9b2226';
-          c.lineWidth = Math.max(2, r * 0.05);
-          c.beginPath();
-          c.moveTo(x - r * 0.34, y + r * 0.08);
-          c.lineTo(x - r * 0.26, y + r * 0.34);
-          c.moveTo(x + r * 0.34, y + r * 0.08);
-          c.lineTo(x + r * 0.26, y + r * 0.34);
-          c.stroke();
-
-          // Biểu cảm lạnh lùng kiên định
-          c.strokeStyle = '#241414';
-          c.lineWidth = Math.max(2.5, r * 0.055);
-          c.beginPath();
-          c.moveTo(x - r * 0.2, y + r * 0.4);
-          c.lineTo(x + r * 0.2, y + r * 0.4);
-          c.stroke();
-          c.restore();
         },
 
         drawCustomEffects(c, self, time) {
@@ -1601,8 +1249,6 @@
         critChance: 0.24,
         critMult: 1.55,
         radius: 60,
-        skill1Cd: 6.8,
-        skill2Cd: 7.0,
         skills: {
           // NỘI TẠI: Phản Xạ Ackerman — 22% tỷ lệ Né Tránh hoàn toàn đòn đánh trực tiếp (DODGE!)
           passive(self, target, arena, eventType, payload) {
@@ -1647,7 +1293,6 @@
 
           // CHIÊU 3 (ULTIMATE): Loạt Thương Sét (Thunder Spear Barrage) — Bắn 4 mũi thương sét phát nổ
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'THUNDER SPEARS!', '#ffd60a');
             arena.showFighterSkill(self, '[THUNDER SPEAR BARRAGE!]', '#ffd60a');
 
@@ -1672,57 +1317,6 @@
             }
             arena.addShake(22);
           }
-        },
-
-        // Fallback Canvas Art: Tóc đen Undercut + Mắt xám sắc lạnh + Khăn quàng cổ trắng Trinh Sát
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.12, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#f8f9fa');
-          faceGrad.addColorStop(0.7, '#dce1e8');
-          faceGrad.addColorStop(1, '#5c677d');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tóc đen undercut đặc trưng
-          c.fillStyle = '#0d0f14';
-          c.beginPath();
-          c.moveTo(x - r, y - r * 0.12);
-          c.lineTo(x - r * 0.55, y - r * 0.32);
-          c.lineTo(x - r * 0.2, y - r * 0.14);
-          c.lineTo(x, y - r * 0.36);
-          c.lineTo(x + r * 0.25, y - r * 0.14);
-          c.lineTo(x + r * 0.6, y - r * 0.3);
-          c.lineTo(x + r, y - r * 0.12);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Mắt xám lạnh lùng hẹp ngang
-          c.shadowColor = '#90e0ef';
-          c.shadowBlur = isAwakened ? 18 : 6;
-          c.fillStyle = isAwakened ? '#00f3ff' : '#33415c';
-          c.fillRect(x - r * 0.44, y - r * 0.04, r * 0.28, r * 0.1);
-          c.fillRect(x + r * 0.16, y - r * 0.04, r * 0.28, r * 0.1);
-
-          // Khăn quàng cổ trắng (Cravat) phía dưới
-          c.shadowBlur = 0;
-          c.fillStyle = '#ffffff';
-          c.beginPath();
-          c.moveTo(x - r * 0.5, y + r * 0.58);
-          c.lineTo(x + r * 0.5, y + r * 0.58);
-          c.lineTo(x + r * 0.7, y + r * 1.1);
-          c.lineTo(x - r * 0.7, y + r * 1.1);
-          c.closePath();
-          c.fill();
-          c.restore();
         }
       };
 
@@ -1740,8 +1334,6 @@
         critChance: 0.16,
         critMult: 1.5,
         radius: 62,
-        skill1Cd: 7.2,
-        skill2Cd: 7.4,
         skills: {
           // NỘI TẠI: Túi Thần Kỳ 4 Chiều — Mỗi 8.5s tự rút ngẫu nhiên Bánh Rán (+5 HP) / Chong Chóng Tre / Khăn Trùm
           passive(self, target, arena, eventType, payload) {
@@ -1778,7 +1370,7 @@
             }
           },
 
-          // CHIÊU 1: Đại Bác Không Khí (Air Cannon) — Bắn vòng sóng khí nén đẩy lùi mạnh khi nảy tường
+          // CHIÊU 1: Đại Bác Không Khí (Air Cannon) — Bắn vòng sóng khí nén đẩy lùi mạnh
           skill1(self, target, arena) {
             SoundFX.bluePull();
             const ang = Math.atan2(target.y - self.y, target.x - self.x);
@@ -1812,107 +1404,32 @@
 
           // CHIÊU 3 (ULTIMATE): Đại Bác Năng Lượng 22nd Century (Super Air Beam)
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, '22ND CENTURY BEAM!', '#0096ff');
             arena.showFighterSkill(self, '[22ND CENTURY BEAM!]', '#00d9ff');
-            self.castFreeze = 0.4;
-            self.pendingUlt = {
-              delay: 0.4,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'dora_beam',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 34),
-                  y: self.y + uy * (self.radius + 34),
-                  vx: ux * 1060,
-                  vy: uy * 1060,
-                  radius: 76,
-                  color: '#00d9ff',
-                  damage: 9.4,
-                  hit: false,
-                  life: 2.2
-                });
-                SoundFX.redBlast();
-                arena.addShake(25);
-                arena.triggerFlash('#00d9ff', 0.3);
-              }
-            };
+            arena.projectiles.push({
+              type: 'dora_beam',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 34),
+              y: self.y + uy * (self.radius + 34),
+              vx: ux * 1060,
+              vy: uy * 1060,
+              radius: 76,
+              color: '#00d9ff',
+              damage: 9.4,
+              hit: false,
+              life: 2.2
+            });
+            SoundFX.redBlast();
+            arena.addShake(25);
+            arena.triggerFlash('#00d9ff', 0.3);
           }
-        },
-
-        // Fallback Canvas Art: Đầu tròn xanh Doraemon + Mặt trắng + Mũi đỏ + 6 Râu + Chuông vàng
-        drawFallbackAvatar(c, x, y, r) {
-          c.save();
-          // Nền xanh dương Doraemon
-          c.fillStyle = '#0096ff';
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Phần mặt trắng tròn bên dưới
-          c.fillStyle = '#ffffff';
-          c.beginPath();
-          c.arc(x, y + r * 0.2, r * 0.82, 0, Math.PI * 2);
-          c.fill();
-
-          // Đôi mắt trắng to sát nhau
-          c.fillStyle = '#ffffff';
-          c.strokeStyle = '#111';
-          c.lineWidth = 2.5;
-          c.beginPath();
-          c.ellipse(x - r * 0.17, y - r * 0.26, r * 0.17, r * 0.22, 0, 0, Math.PI * 2);
-          c.fill(); c.stroke();
-          c.beginPath();
-          c.ellipse(x + r * 0.17, y - r * 0.26, r * 0.17, r * 0.22, 0, 0, Math.PI * 2);
-          c.fill(); c.stroke();
-
-          // Con ngươi đen
-          c.fillStyle = '#111';
-          c.beginPath();
-          c.arc(x - r * 0.1, y - r * 0.24, r * 0.06, 0, Math.PI * 2);
-          c.arc(x + r * 0.1, y - r * 0.24, r * 0.06, 0, Math.PI * 2);
-          c.fill();
-
-          // Chiếc mũi đỏ bóng
-          c.fillStyle = '#e63946';
-          c.beginPath();
-          c.arc(x, y - r * 0.04, r * 0.13, 0, Math.PI * 2);
-          c.fill();
-
-          // Râu mèo 3 sợi mỗi bên + Miệng cười
-          c.strokeStyle = '#111';
-          c.lineWidth = 2.4;
-          c.beginPath();
-          c.moveTo(x, y + r * 0.09);
-          c.lineTo(x, y + r * 0.36);
-          c.arc(x, y + r * 0.12, r * 0.34, 0.2 * Math.PI, 0.8 * Math.PI);
-          for (const dy of [-0.02, 0.1, 0.22]) {
-            c.moveTo(x - r * 0.65, y + r * dy);
-            c.lineTo(x - r * 0.24, y + r * (dy + 0.03));
-            c.moveTo(x + r * 0.24, y + r * (dy + 0.03));
-            c.lineTo(x + r * 0.65, y + r * dy);
-          }
-          c.stroke();
-
-          // Vòng cổ đỏ & Chuông vàng
-          c.fillStyle = '#e63946';
-          c.fillRect(x - r, y + r * 0.68, r * 2, r * 0.16);
-          c.fillStyle = '#ffd60a';
-          c.beginPath();
-          c.arc(x, y + r * 0.8, r * 0.16, 0, Math.PI * 2);
-          c.fill();
-          c.restore();
         }
       };
 
@@ -1930,14 +1447,11 @@
         critChance: 0.19,
         critMult: 1.55,
         radius: 62,
-        skill1Cd: 7.4,
-        skill2Cd: 7.2,
         skills: {
-          // NỘI TẠI: Che Giấu Ma Lực (Mana Suppression) — Trên 50% HP tích nộ nhanh +25%; Dưới 50% HP tăng +22% dame
+          // Defensive magic and stronger spells below half HP.
           passive(self, target, arena, eventType, payload) {
             if (eventType === 'update') {
-              self.energyGainMult = self.currentHp > self.maxHp * 0.5 ? 1.25 : 1.0;
-              self.custom.manaUnleashed = self.currentHp <= self.maxHp * 0.5;
+              self.custom.magicUnleashed = self.currentHp <= self.maxHp * 0.5;
             } else if (eventType === 'onTakeDamage') {
               const dmgInfo = payload;
               if (self.magicShield && !dmgInfo.isDot) {
@@ -1961,7 +1475,7 @@
           // CHIÊU 2: Ma Pháp Sát Nhân (Zoltraak) — Bắn tia ma pháp trắng-xanh xuyên giáp
           skill2(self, target, arena, hitInfo) {
             SoundFX.slash();
-            const bonus = self.custom.manaUnleashed ? 1.22 : 1.0;
+            const bonus = self.custom.magicUnleashed ? 1.22 : 1.0;
             hitInfo.damage = (hitInfo.damage * 1.45 + 0.8) * bonus;
             hitInfo.isCrit = true;
             arena.addShake(15);
@@ -1972,103 +1486,33 @@
 
           // CHIÊU 3 (ULTIMATE): Đỉnh Cao Ma Pháp (Height of Magic — Black Hole)
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'HEIGHT OF MAGIC!', '#c8b6ff');
             arena.showFighterSkill(self, '[HEIGHT OF MAGIC!]', '#c8b6ff');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                const dmg = self.custom.manaUnleashed ? 10.6 : 9.2;
-                arena.projectiles.push({
-                  type: 'frieren_blackhole',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 34),
-                  y: self.y + uy * (self.radius + 34),
-                  vx: ux * 920,
-                  vy: uy * 920,
-                  radius: 80,
-                  color: '#c8b6ff',
-                  damage: dmg,
-                  hit: false,
-                  life: 2.3
-                });
-                SoundFX.redBlast();
-                arena.addShake(26);
-                arena.triggerFlash('#c8b6ff', 0.34);
-              }
-            };
+            const dmg = self.custom.magicUnleashed ? 10.6 : 9.2;
+            arena.projectiles.push({
+              type: 'frieren_blackhole',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 34),
+              y: self.y + uy * (self.radius + 34),
+              vx: ux * 920,
+              vy: uy * 920,
+              radius: 80,
+              color: '#c8b6ff',
+              damage: dmg,
+              hit: false,
+              life: 2.3
+            });
+            SoundFX.redBlast();
+            arena.addShake(26);
+            arena.triggerFlash('#c8b6ff', 0.34);
           }
-        },
-
-        // Fallback Canvas Art: Tóc trắng bạc 2 bím + Tai Elf nhọn + Mắt xanh lục bảo
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.12, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#ffffff');
-          faceGrad.addColorStop(0.68, '#f1e4f3');
-          faceGrad.addColorStop(1, '#9d8df1');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Mái tóc trắng bạc chia ngôi + 2 lọn buộc bên
-          c.fillStyle = '#eef2ff';
-          c.beginPath();
-          c.moveTo(x - r, y + r * 0.35);
-          c.lineTo(x - r * 0.65, y - r * 0.25);
-          c.lineTo(x, y - r * 0.48);
-          c.lineTo(x + r * 0.65, y - r * 0.25);
-          c.lineTo(x + r, y + r * 0.35);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Đôi tai Elf nhọn 2 bên
-          c.fillStyle = '#ffe5d9';
-          c.beginPath();
-          c.moveTo(x - r * 0.65, y - r * 0.05);
-          c.lineTo(x - r * 0.96, y - r * 0.14);
-          c.lineTo(x - r * 0.65, y + r * 0.14);
-          c.closePath();
-          c.fill();
-          c.beginPath();
-          c.moveTo(x + r * 0.65, y - r * 0.05);
-          c.lineTo(x + r * 0.96, y - r * 0.14);
-          c.lineTo(x + r * 0.65, y + r * 0.14);
-          c.closePath();
-          c.fill();
-
-          // Đôi mắt xanh lục bảo đặc trưng của Frieren
-          c.shadowColor = '#72efdd';
-          c.shadowBlur = isAwakened ? 22 : 10;
-          c.fillStyle = isAwakened ? '#a0ffef' : '#2ec4b6';
-          c.beginPath();
-          c.ellipse(x - r * 0.27, y - r * 0.02, r * 0.14, r * 0.1, 0, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.27, y - r * 0.02, r * 0.14, r * 0.1, 0, 0, Math.PI * 2);
-          c.fill();
-
-          // Nụ cười điềm tĩnh nhẹ nhàng
-          c.shadowBlur = 0;
-          c.strokeStyle = '#4a4e69';
-          c.lineWidth = Math.max(2.2, r * 0.05);
-          c.beginPath();
-          c.arc(x, y + r * 0.3, r * 0.18, 0.15 * Math.PI, 0.85 * Math.PI);
-          c.stroke();
-          c.restore();
         },
 
         drawCustomEffects(c, self, time) {
@@ -2101,8 +1545,6 @@
         critChance: 0.19,
         critMult: 1.55,
         radius: 62,
-        skill1Cd: 7.4,
-        skill2Cd: 7.4,
         skills: {
           // NỘI TẠI: Thần Sấm (God of Thunder) — 35% cơ hội giáng thêm tia sét phụ khi đánh trúng
           passive(self, target, arena, eventType, payload) {
@@ -2118,7 +1560,7 @@
             }
           },
 
-          // CHIÊU 1: Ném Búa Mjolnir (Mjolnir Throw) — Búa bay xuyên đối thủ khi nảy tường
+          // CHIÊU 1: Ném Búa Mjolnir (Mjolnir Throw) — Búa bay xuyên đối thủ
           skill1(self, target, arena) {
             SoundFX.slash();
             const ang = Math.atan2(target.y - self.y, target.x - self.x);
@@ -2155,100 +1597,32 @@
 
           // CHIÊU 3 (ULTIMATE): Rìu Thần Stormbreaker (Bifrost Stormbreaker)
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'STORMBREAKER!', '#38bdf8');
             arena.showFighterSkill(self, '[BIFROST STORMBREAKER!]', '#38bdf8');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'stormbreaker_ult',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 34),
-                  y: self.y + uy * (self.radius + 34),
-                  vx: ux * 1040,
-                  vy: uy * 1040,
-                  radius: 78,
-                  color: '#38bdf8',
-                  damage: 9.6,
-                  hit: false,
-                  life: 2.2
-                });
-                SoundFX.redBlast();
-                arena.addShake(26);
-                arena.triggerFlash('#7dd3fc', 0.34);
-              }
-            };
+            arena.projectiles.push({
+              type: 'stormbreaker_ult',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 34),
+              y: self.y + uy * (self.radius + 34),
+              vx: ux * 1040,
+              vy: uy * 1040,
+              radius: 78,
+              color: '#38bdf8',
+              damage: 9.6,
+              hit: false,
+              life: 2.2
+            });
+            SoundFX.redBlast();
+            arena.addShake(26);
+            arena.triggerFlash('#7dd3fc', 0.34);
           }
-        },
-
-        // Fallback Canvas Art: Mũ giáp có cánh bạc + Tóc vàng + Mắt phát sét xanh dương
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.14, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#fff2e2');
-          faceGrad.addColorStop(0.68, '#e3be9e');
-          faceGrad.addColorStop(1, '#5b7c99');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tóc vàng hai bên
-          c.fillStyle = '#facc15';
-          c.fillRect(x - r, y - r * 0.4, r * 0.32, r * 0.85);
-          c.fillRect(x + r * 0.68, y - r * 0.4, r * 0.32, r * 0.85);
-
-          // Mũ giáp bạc Asgard phía trên
-          c.fillStyle = '#94a3b8';
-          c.beginPath();
-          c.arc(x, y - r * 0.28, r * 0.92, Math.PI, 0);
-          c.closePath();
-          c.fill();
-
-          // Đôi cánh trắng bạc 2 bên mũ
-          c.fillStyle = '#f8fafc';
-          c.beginPath();
-          c.moveTo(x - r * 0.55, y - r * 0.34);
-          c.lineTo(x - r * 0.95, y - r * 0.72);
-          c.lineTo(x - r * 0.42, y - r * 0.52);
-          c.closePath();
-          c.fill();
-          c.beginPath();
-          c.moveTo(x + r * 0.55, y - r * 0.34);
-          c.lineTo(x + r * 0.95, y - r * 0.72);
-          c.lineTo(x + r * 0.42, y - r * 0.52);
-          c.closePath();
-          c.fill();
-
-          // Đôi mắt phát sét xanh neon
-          c.shadowColor = '#38bdf8';
-          c.shadowBlur = isAwakened ? 24 : 14;
-          c.fillStyle = '#e0f2fe';
-          c.beginPath();
-          c.ellipse(x - r * 0.27, y - r * 0.02, r * 0.15, r * 0.09, 0, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.27, y - r * 0.02, r * 0.15, r * 0.09, 0, 0, Math.PI * 2);
-          c.fill();
-
-          // Râu quai nón vàng gọn
-          c.shadowBlur = 0;
-          c.fillStyle = '#ca8a04';
-          c.beginPath();
-          c.arc(x, y + r * 0.44, r * 0.36, 0, Math.PI);
-          c.fill();
-          c.restore();
         }
       };
 
@@ -2266,8 +1640,6 @@
         critChance: 0.17,
         critMult: 1.5,
         radius: 62,
-        skill1Cd: 7.0,
-        skill2Cd: 7.2,
         skills: {
           // NỘI TẠI: Khiên Vibranium — Giảm 20% sát thương trực tiếp & phản 35% sát thương cận chiến
           passive(self, target, arena, eventType, payload) {
@@ -2289,7 +1661,7 @@
             }
           },
 
-          // CHIÊU 1: Ném Khiên Vibranium (Shield Throw) — Khiên xoay bay cực nhanh khi nảy tường
+          // CHIÊU 1: Ném Khiên Vibranium (Shield Throw) — Khiên xoay bay cực nhanh
           skill1(self, target, arena) {
             SoundFX.block();
             const ang = Math.atan2(target.y - self.y, target.x - self.x);
@@ -2325,78 +1697,32 @@
 
           // CHIÊU 3 (ULTIMATE): Avengers Assemble — Siêu sóng xung kích Khiên + Sét
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'AVENGERS ASSEMBLE!', '#3b82f6');
             arena.showFighterSkill(self, '[AVENGERS ASSEMBLE!]', '#60a5fa');
-            self.castFreeze = 0.4;
-            self.pendingUlt = {
-              delay: 0.4,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'cap_assemble_ult',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 34),
-                  y: self.y + uy * (self.radius + 34),
-                  vx: ux * 1020,
-                  vy: uy * 1020,
-                  radius: 76,
-                  color: '#3b82f6',
-                  damage: 9.4,
-                  hit: false,
-                  life: 2.2
-                });
-                SoundFX.redBlast();
-                arena.addShake(25);
-                arena.triggerFlash('#60a5fa', 0.32);
-              }
-            };
+            arena.projectiles.push({
+              type: 'cap_assemble_ult',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 34),
+              y: self.y + uy * (self.radius + 34),
+              vx: ux * 1020,
+              vy: uy * 1020,
+              radius: 76,
+              color: '#3b82f6',
+              damage: 9.4,
+              hit: false,
+              life: 2.2
+            });
+            SoundFX.redBlast();
+            arena.addShake(25);
+            arena.triggerFlash('#60a5fa', 0.32);
           }
-        },
-
-        // Fallback Canvas Art: Mũ giáp xanh chữ A trắng + Mắt xanh + Huy hiệu Khiên Vibranium
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          // Nền xanh dương mũ giáp Captain America
-          c.fillStyle = '#1d4ed8';
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Phần cằm lộ da phía dưới mặt nạ
-          c.fillStyle = '#f3cbb0';
-          c.fillRect(x - r * 0.56, y + r * 0.14, r * 1.12, r * 0.86);
-
-          // Chữ A trắng nổi bật trên trán
-          c.fillStyle = '#ffffff';
-          c.font = `900 ${Math.round(r * 0.52)}px 'Segoe UI', Impact, sans-serif`;
-          c.textAlign = 'center';
-          c.textBaseline = 'middle';
-          c.fillText('A', x, y - r * 0.48);
-
-          // Đôi mắt quyết đoán
-          c.fillStyle = isAwakened ? '#93c5fd' : '#ffffff';
-          c.beginPath();
-          c.ellipse(x - r * 0.28, y - r * 0.04, r * 0.15, r * 0.08, 0, 0, Math.PI * 2);
-          c.ellipse(x + r * 0.28, y - r * 0.04, r * 0.15, r * 0.08, 0, 0, Math.PI * 2);
-          c.fill();
-
-          // Dải viền đỏ-trắng đặc trưng phía dưới
-          c.fillStyle = '#ef4444';
-          c.fillRect(x - r, y + r * 0.62, r * 2, r * 0.16);
-          c.fillStyle = '#ffffff';
-          c.fillRect(x - r, y + r * 0.78, r * 2, r * 0.16);
-          c.restore();
         }
       };
 
@@ -2414,17 +1740,12 @@
         critChance: 0.2,
         critMult: 1.55,
         radius: 62,
-        skill1Cd: 7.0,
-        skill2Cd: 7.4,
         skills: {
-          // NỘI TẠI: Lò Phản Ứng Hồ Quang (Arc Reactor) — Tích năng lượng nhanh hơn +30%
           passive(self, target, arena, eventType) {
-            if (eventType === 'init' || eventType === 'update') {
-              self.energyGainMult = 1.3;
-            }
+            if (eventType === 'init') self.castIntervalMultiplier = .94;
           },
 
-          // CHIÊU 1: Tia Phản Lực (Repulsor Blast) — Bắn 2 tia năng lượng xanh trắng siêu nhanh khi nảy tường
+          // CHIÊU 1: Tia Phản Lực (Repulsor Blast) — Bắn 2 tia năng lượng xanh trắng siêu nhanh
           skill1(self, target, arena) {
             SoundFX.slash();
             const baseAng = Math.atan2(target.y - self.y, target.x - self.x);
@@ -2462,86 +1783,32 @@
 
           // CHIÊU 3 (ULTIMATE): Đại Pháo Unibeam (Unibeam Overdrive)
           ultimate(self, target, arena) {
-            SoundFX.ultimate();
             arena.triggerUltimateCinematic(self, 'UNIBEAM OVERDRIVE!', '#38bdf8');
             arena.showFighterSkill(self, '[UNIBEAM OVERDRIVE!]', '#7dd3fc');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
+            const dx = target.x - self.x;
+            const dy = target.y - self.y;
+            const d = Math.hypot(dx, dy) || 1;
+            const ux = dx / d;
+            const uy = dy / d;
 
-                arena.projectiles.push({
-                  type: 'unibeam_ult',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 34),
-                  y: self.y + uy * (self.radius + 34),
-                  vx: ux * 1120,
-                  vy: uy * 1120,
-                  radius: 78,
-                  color: '#7dd3fc',
-                  damage: 9.5,
-                  hit: false,
-                  life: 2.2
-                });
-                SoundFX.redBlast();
-                arena.addShake(26);
-                arena.triggerFlash('#7dd3fc', 0.34);
-              }
-            };
+            arena.projectiles.push({
+              type: 'unibeam_ult',
+              owner: self,
+              target,
+              x: self.x + ux * (self.radius + 34),
+              y: self.y + uy * (self.radius + 34),
+              vx: ux * 1120,
+              vy: uy * 1120,
+              radius: 78,
+              color: '#7dd3fc',
+              damage: 9.5,
+              hit: false,
+              life: 2.2
+            });
+            SoundFX.redBlast();
+            arena.addShake(26);
+            arena.triggerFlash('#7dd3fc', 0.34);
           }
-        },
-
-        // Fallback Canvas Art: Mũ giáp Iron Man đỏ + Mặt nạ vàng kim + 2 khe mắt xanh sáng rực
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          // Nền giáp đỏ thẫm
-          c.fillStyle = '#b91c1c';
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Tấm mặt nạ vàng kim đặc trưng của Iron Man
-          c.fillStyle = '#facc15';
-          c.beginPath();
-          c.moveTo(x - r * 0.52, y - r * 0.65);
-          c.lineTo(x + r * 0.52, y - r * 0.65);
-          c.lineTo(x + r * 0.62, y + r * 0.15);
-          c.lineTo(x + r * 0.36, y + r * 0.64);
-          c.lineTo(x - r * 0.36, y + r * 0.64);
-          c.lineTo(x - r * 0.62, y + r * 0.15);
-          c.closePath();
-          c.fill();
-
-          // Khe trán đỏ chia mặt nạ
-          c.fillStyle = '#b91c1c';
-          c.fillRect(x - r * 0.22, y - r * 0.72, r * 0.44, r * 0.28);
-
-          // 2 khe mắt chữ nhật phát sáng xanh trắng
-          c.shadowColor = '#38bdf8';
-          c.shadowBlur = isAwakened ? 24 : 14;
-          c.fillStyle = '#e0f2fe';
-          c.fillRect(x - r * 0.44, y - r * 0.12, r * 0.32, r * 0.12);
-          c.fillRect(x + r * 0.12, y - r * 0.12, r * 0.32, r * 0.12);
-
-          // Đường viền miệng giáp
-          c.shadowBlur = 0;
-          c.strokeStyle = '#7f1d1d';
-          c.lineWidth = Math.max(2.5, r * 0.06);
-          c.beginPath();
-          c.moveTo(x - r * 0.32, y + r * 0.34);
-          c.lineTo(x + r * 0.32, y + r * 0.34);
-          c.stroke();
-          c.restore();
         }
       };
 
@@ -2559,149 +1826,10 @@
         critChance: 0.18,
         critMult: 1.6,
         radius: 65, // To hơn một chút chuẩn vóc dáng Hulk
-        skill1Cd: 7.6,
-        skill2Cd: 7.4,
         skills: {
-          // NỘI TẠI: Cơn Thịnh Nộ Vô Hạn (Unlimited Rage) — Máu càng thấp đánh càng mạnh (tối đa +45%)
-          passive(self, target, arena, eventType, payload) {
-            if (eventType === 'onTakeDamage') {
-              const dmgInfo = payload;
-              if (!dmgInfo.blocked && dmgInfo.amount > 0) {
-                self.addEnergy(3); // Bị đánh càng tăng nộ nhanh
-              }
-            }
-          },
-
-          // CHIÊU 1: Vỗ Tay Sấm Sét (Thunderclap) — Bắn sóng xung kích Gamma đẩy lùi mạnh khi nảy tường
-          skill1(self, target, arena) {
-            SoundFX.redBlast();
-            const ang = Math.atan2(target.y - self.y, target.x - self.x);
-            arena.projectiles.push({
-              type: 'thunderclap',
-              owner: self,
-              target,
-              x: self.x + Math.cos(ang) * (self.radius + 18),
-              y: self.y + Math.sin(ang) * (self.radius + 18),
-              vx: Math.cos(ang) * 940,
-              vy: Math.sin(ang) * 940,
-              angle: ang,
-              radius: 40,
-              color: '#4ade80',
-              damage: 3.1,
-              hit: false,
-              life: 1.5
-            });
-            arena.showFighterSkill(self, '[THUNDERCLAP!]', '#4ade80');
-          },
-
-          // CHIÊU 2: HULK SMASH — Cú đập chí mạng tăng theo lượng máu đã mất + hất văng cực mạnh
-          skill2(self, target, arena, hitInfo) {
-            SoundFX.redBlast();
-            const missingRatio = Math.max(0, (self.maxHp - self.currentHp) / self.maxHp);
-            const rageBonus = 1 + missingRatio * 0.45;
-            hitInfo.damage *= 1.5 * rageBonus;
-            hitInfo.knockbackBoost = 2.5;
-            hitInfo.isCrit = true;
-            arena.addShake(20);
-            arena.spawnRing(hitInfo.cx, hitInfo.cy, 18, 220, '#22c55e', 0.45);
-            arena.spawnParticles(hitInfo.cx, hitInfo.cy, '#4ade80', 36, 580);
-            arena.showFighterSkill(self, '[HULK SMASH!]', '#22c55e');
-          },
-
-          // CHIÊU 3 (ULTIMATE): Kẻ Phá Hủy Thế Giới (World Breaker Gamma Quake)
-          ultimate(self, target, arena) {
-            SoundFX.ultimate();
-            arena.triggerUltimateCinematic(self, 'WORLD BREAKER!', '#22c55e');
-            arena.showFighterSkill(self, '[WORLD BREAKER!]', '#4ade80');
-            self.castFreeze = 0.45;
-            self.pendingUlt = {
-              delay: 0.45,
-              execute: () => {
-                const dx = target.x - self.x;
-                const dy = target.y - self.y;
-                const d = Math.hypot(dx, dy) || 1;
-                const ux = dx / d;
-                const uy = dy / d;
-
-                arena.projectiles.push({
-                  type: 'gamma_quake',
-                  owner: self,
-                  target,
-                  x: self.x + ux * (self.radius + 36),
-                  y: self.y + uy * (self.radius + 36),
-                  vx: ux * 920,
-                  vy: uy * 920,
-                  radius: 86,
-                  color: '#22c55e',
-                  damage: 10.2,
-                  hit: false,
-                  life: 2.3
-                });
-                target.domainSlowTimer = Math.max(target.domainSlowTimer, 1.5);
-                SoundFX.redBlast();
-                arena.addShake(30);
-                arena.triggerFlash('#22c55e', 0.36);
-              }
-            };
+          passive(self, target, arena, eventType) {
+            if (eventType === 'update') self.castIntervalMultiplier = self.currentHp <= self.maxHp * .5 ? .93 : 1;
           }
-        },
-
-        // Fallback Canvas Art: Đầu xanh lá Hulk + Tóc đen xù góc cạnh + Mắt giận dữ + Hàm răng nghiến
-        drawFallbackAvatar(c, x, y, r, isAwakened) {
-          c.save();
-          const faceGrad = c.createRadialGradient(x, y + r * 0.1, r * 0.1, x, y, r);
-          faceGrad.addColorStop(0, '#86efac');
-          faceGrad.addColorStop(0.6, '#22c55e');
-          faceGrad.addColorStop(1, '#14532d');
-          c.fillStyle = faceGrad;
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.fill();
-
-          c.beginPath();
-          c.arc(x, y, r, 0, Math.PI * 2);
-          c.clip();
-
-          // Mái tóc đen xù dày
-          c.fillStyle = '#0f172a';
-          c.beginPath();
-          c.moveTo(x - r, y - r * 0.25);
-          c.lineTo(x - r * 0.5, y - r * 0.48);
-          c.lineTo(x - r * 0.15, y - r * 0.34);
-          c.lineTo(x + r * 0.2, y - r * 0.5);
-          c.lineTo(x + r * 0.6, y - r * 0.34);
-          c.lineTo(x + r, y - r * 0.25);
-          c.lineTo(x + r, y - r * 1.2);
-          c.lineTo(x - r, y - r * 1.2);
-          c.closePath();
-          c.fill();
-
-          // Đôi lông mày nhíu giận dữ + Mắt phát sáng xanh/vàng
-          c.fillStyle = isAwakened ? '#bef264' : '#ffffff';
-          c.shadowColor = '#22c55e';
-          c.shadowBlur = isAwakened ? 20 : 8;
-          c.beginPath();
-          c.moveTo(x - r * 0.46, y - r * 0.14);
-          c.lineTo(x - r * 0.14, y - r * 0.02);
-          c.lineTo(x - r * 0.42, y + r * 0.04);
-          c.closePath();
-          c.fill();
-
-          c.beginPath();
-          c.moveTo(x + r * 0.46, y - r * 0.14);
-          c.lineTo(x + r * 0.14, y - r * 0.02);
-          c.lineTo(x + r * 0.42, y + r * 0.04);
-          c.closePath();
-          c.fill();
-
-          // Hàm răng trắng nghiến chặt đầy uy lực
-          c.shadowBlur = 0;
-          c.fillStyle = '#ffffff';
-          c.strokeStyle = '#052e16';
-          c.lineWidth = 3;
-          c.fillRect(x - r * 0.36, y + r * 0.22, r * 0.72, r * 0.24);
-          c.strokeRect(x - r * 0.36, y + r * 0.22, r * 0.72, r * 0.24);
-          c.restore();
         }
       };
 
@@ -2720,6 +1848,16 @@
         hulk: new Character(HULK_CONFIG)
       };
 
+      for (const id of FighterRoster.ids) {
+        if (CHARACTER_REGISTRY[id]) continue;
+        const profile = FighterRoster.get(id);
+        CHARACTER_REGISTRY[id] = new Character({
+          id, name: profile.name, color: profile.forms[0][1], maxHp: 100,
+          speed: profile.speed || 395, radius: 62, attack: 2, defense: .54,
+          skills: { passive: FighterForms.passive }
+        });
+      }
+
       // =========================================================================
       // 5. FIGHTER RUNTIME INSTANCE
       // =========================================================================
@@ -2736,22 +1874,24 @@
           this.vy = Math.sin(angle) * character.speed;
 
           this.radius = character.radius;
+          this.mass = 1;
+          this.guardTimer = 0;
           this.maxHp = character.maxHp;
           this.currentHp = character.maxHp;
           this.displayHp = character.maxHp;
           this.trailHp = character.maxHp;
 
-          this.energy = 0;         // Thanh năng lượng 0 -> 100
-          this.displayEnergy = 0;
-          this.skill1Timer = character.skill1Cd * 0.55; // Khởi đầu hồi sẵn 55% để sớm có hành động
-          this.skill2Timer = character.skill2Cd * 0.6;
-          this.ultLowHpTriggered = false;
+          this.nextCastAt = side === 0 ? .32 : .86;
+          this.castIndex = 0;
+          this.castIntervalMultiplier = 1;
 
+          this.formStage = 0;
+          this.formBefore = null;
           this.isAwakened = false;
+          this.skillCast = null;
+          this.motion = FighterAnimator.create();
           this.hitFlash = 0;       // White flash 0.1s khi dính đòn
           this.ultScale = 1.0;
-          this.castFreeze = 0;     // Dừng bóng khi tụ Hollow Purple
-          this.pendingUlt = null;
 
           this.bleedStacks = [];   // [{ dps, remaining, tickAccum, source }] (tối đa 3 stack)
           this.redSlamArmed = false;
@@ -2759,8 +1899,8 @@
           this.domainSlowTimer = 0;
           this.speedBoostTimer = 0;
           this.damageDebuffTimer = 0;
+          this.shrinkTimer = 0;
           this.magicShield = false;
-          this.energyGainMult = 1.0;
           this.activeSkillCallout = null; // Hiển thị tên skill ngay dưới vạch máu (không che sàn đấu)
 
           this.totalDamageDealt = 0;
@@ -2771,10 +1911,6 @@
           if (character.skills.passive) {
             character.skills.passive(this, null, null, 'init');
           }
-        }
-
-        addEnergy(amount) {
-          this.energy = Math.min(100, this.energy + amount * (this.energyGainMult || 1.0));
         }
 
         addBleedStack(source, dps, duration, maxStacks = 3) {
@@ -2798,7 +1934,8 @@
           this.p1Id = 'gojo';
           this.p2Id = 'sukuna';
           this.seed = '7772026';
-          this.userSpeed = 1.0;
+          this.matchDuration = DEFAULT_DURATION;
+          this.winnerPreference = 'auto';
           this.running = false;
           this.reset();
         }
@@ -2807,10 +1944,17 @@
           this.rng = createRNG(this.seed);
           this.elapsed = 0;
           this.time = 0;
-          this.arenaRadius = ARENA_INITIAL_RADIUS;
-          this.isShrinking = false;
-          this.isOverdrive = false;
+          this.arenaRadius = ARENA_RADIUS;
+          this.centerX = ARENA_CX;
+          this.centerY = ARENA_CY;
+          this.clashAge = 0;
+          this.intensity = 0;
           this.collisionCooldown = 0;
+          this.hitStop = 0;
+          this.finalFormStages = [null, null];
+          this.ultimateDomains = [null, null];
+          this.transformation = TransformationScene.create();
+          this.matchDamage = MatchDamage.create(this.matchDuration);
 
           // Active skill entities & FX pools
           this.particles = [];
@@ -2842,10 +1986,17 @@
 
         triggerFlash(color = '#ffffff', alpha = 0.65) {
           this.flash.color = color;
-          this.flash.alpha = Math.max(this.flash.alpha, alpha);
+          this.flash.alpha = Math.max(this.flash.alpha, Math.min(.36, alpha));
+        }
+
+        playCastSound(cast) {
+          if (cast.contact) {
+            if (['claws', 'sword', 'odm', 'baton', 'hammer'].includes(cast.technique)) SoundFX.slash();
+          } else if (cast.slot === 'ultimate') SoundFX.redBlast();
         }
 
         triggerUltimateCinematic(caster, text, color) {
+          SoundFX.ultimate();
           caster.ultScale = 1.24;
           this.ultCinematic = { active: true, timer: 0, duration: 0.45, text, color };
         }
@@ -2913,15 +2064,26 @@
         }
 
         // --- Main Simulation Update ---
-        update(rawDt) {
-          let timeScale = this.userSpeed;
-          if (this.koState) {
-            this.koState.realTimer += rawDt;
-            timeScale = this.koState.realTimer < this.koState.duration ? 0.2 : 0.0;
+        update(elapsedDt) {
+          const rawDt = Math.min(.05, elapsedDt);
+          if (this.koState) this.koState.realTimer += elapsedDt;
+
+          const playing = this.running && !this.koState;
+          const remaining = this.matchDuration - this.elapsed;
+          const endsNow = playing && remaining - elapsedDt < 1e-9;
+          const activeDt = playing ? Math.min(rawDt, Math.max(0, remaining)) : 0;
+          const stoppedTime = Math.min(this.hitStop, activeDt);
+          this.hitStop -= stoppedTime;
+          if (playing) {
+            this.elapsed = endsNow ? this.matchDuration : this.elapsed + elapsedDt;
+            const progress = this.elapsed / this.matchDuration;
+            this.intensity = progress * progress;
           }
 
-          const dt = rawDt * timeScale;
           this.time += rawDt;
+          const cinematic = playing && !endsNow && TransformationScene.advance(this, Math.min(elapsedDt, remaining));
+          const dt = cinematic ? 0 : activeDt - stoppedTime;
+          MatchDamage.prune(this);
 
           this.shakeIntensity = Math.max(0, this.shakeIntensity - rawDt * 52);
           this.flash.alpha = Math.max(0, this.flash.alpha - rawDt * 1.9);
@@ -2936,7 +2098,6 @@
           for (const f of this.fighters) {
             f.displayHp += (f.currentHp - f.displayHp) * Math.min(1, rawDt * 14);
             f.trailHp += (f.currentHp - f.trailHp) * Math.min(1, rawDt * 3.8);
-            f.displayEnergy += (f.energy - f.displayEnergy) * Math.min(1, rawDt * 12);
             f.hitFlash = Math.max(0, f.hitFlash - rawDt * 10); // ~0.1s white flash
             f.ultScale += (1.0 - f.ultScale) * Math.min(1, rawDt * 5);
             if (f.activeSkillCallout) {
@@ -2947,73 +2108,28 @@
             }
           }
 
-          if (!this.running || dt <= 0) {
-            this.updateVisualPools(rawDt * (this.koState ? 0.35 : 0));
+          if (dt <= 0) {
+            this.updateVisualPools(this.koState ? rawDt : stoppedTime * .35);
+            if (playing && !cinematic) MatchDamage.advance(this);
+            if (endsNow) this.finishTimedMatch();
+            else if (playing) this.updateTimerDOM();
             return;
           }
 
-          if (!this.koState) {
-            this.elapsed += dt;
-          }
-
-          // 1. Pacing: Thu bo sau 15s & Overdrive 2x sát thương sau 30s
-          if (!this.isShrinking && this.elapsed >= SHRINK_START_TIME) {
-            this.isShrinking = true;
-            this.spawnSkillPopup(ARENA_CX, 455, '[ZONE SHRINKING!]', '#ff8800', 42);
-          }
-          if (this.isShrinking && this.arenaRadius > ARENA_MIN_RADIUS) {
-            this.arenaRadius = Math.max(ARENA_MIN_RADIUS, this.arenaRadius - ARENA_SHRINK_RATE * dt);
-          }
-
-          if (!this.isOverdrive && this.elapsed >= OVERDRIVE_START_TIME) {
-            this.isOverdrive = true;
-            this.addShake(18);
-            this.triggerFlash('#ff003c', 0.25);
-            this.spawnSkillPopup(ARENA_CX, 495, '[OVERDRIVE — 2X DAMAGE!]', '#ffd60a', 46);
-          }
-
-          // 2. Cập nhật nhân vật, Awakening (<30% HP), Passive, Ultimate & Bleed
           if (!this.koState) {
             for (let i = 0; i < 2; i++) {
               const f = this.fighters[i];
               const enemy = this.fighters[1 - i];
 
-              f.skill1Timer += dt;
-              f.skill2Timer += dt;
+              FighterAnimator.advance(f.motion, dt);
+              FighterForms.sync(this, f);
               f.domainSlowTimer = Math.max(0, f.domainSlowTimer - dt);
               f.speedBoostTimer = Math.max(0, f.speedBoostTimer - dt);
               f.damageDebuffTimer = Math.max(0, f.damageDebuffTimer - dt);
+              f.shrinkTimer = Math.max(0, f.shrinkTimer - dt);
+              f.guardTimer = Math.max(0, f.guardTimer - dt);
 
-              // Pending Ultimate cast (VD: Gojo tụ năng lượng 0.5s trước khi bắn Hollow Purple)
-              if (f.castFreeze > 0) {
-                f.castFreeze = Math.max(0, f.castFreeze - dt);
-                if (f.pendingUlt) {
-                  f.pendingUlt.delay -= dt;
-                  if (f.pendingUlt.delay <= 0) {
-                    const fn = f.pendingUlt.execute;
-                    f.pendingUlt = null;
-                    fn();
-                  }
-                }
-              }
-
-              // Phase Awakening (< 30% HP)
-              if (!f.isAwakened && f.currentHp > 0 && f.currentHp <= f.maxHp * 0.3) {
-                f.isAwakened = true;
-                this.addShake(20);
-                this.spawnRing(f.x, f.y, f.radius, f.radius + 170, f.char.color, 0.5);
-                this.spawnParticles(f.x, f.y, f.char.color, 40, 520);
-                this.showFighterSkill(f, '[AWAKENING!]', '#ffd60a');
-              }
-
-              // Kích hoạt Ultimate khi Energy = 100 HOẶC lần đầu máu dưới 30%
-              const triggerByEnergy = f.energy >= 100;
-              const triggerByLowHp = !f.ultLowHpTriggered && f.currentHp > 0 && f.currentHp <= f.maxHp * 0.3;
-              if ((triggerByEnergy || triggerByLowHp) && !f.pendingUlt && f.char.skills.ultimate) {
-                if (triggerByLowHp) f.ultLowHpTriggered = true;
-                f.energy = 0;
-                f.char.skills.ultimate(f, enemy, this);
-              }
+              SkillTimeline.advanceRotation(this, f, enemy, dt);
 
               // Passive Update
               if (f.char.skills.passive) {
@@ -3025,7 +2141,7 @@
                 this.spawnParticles(
                   f.x + (Math.random() - 0.5) * f.radius * 1.7,
                   f.y + (Math.random() - 0.5) * f.radius * 1.7,
-                  f.char.color,
+                  FighterForms.color(f),
                   1,
                   150
                 );
@@ -3061,24 +2177,21 @@
           // 5. Cập nhật Đạn / Chưởng (Dismantle & Hollow Purple)
           this.updateProjectiles(dt);
 
-          // 6. Vật lý 2D với Sub-stepping (Nhịp đấu mượt mà 50s - 60s)
+          // Integrate movement and collisions in three physics steps.
           this.collisionCooldown = Math.max(0, this.collisionCooldown - dt);
           const subSteps = 3;
           const subDt = dt / subSteps;
-          const pacingBoost = Math.min(1.55, 1 + this.elapsed * 0.009);
 
           for (let s = 0; s < subSteps; s++) {
             for (let i = 0; i < 2; i++) {
               const f = this.fighters[i];
               const enemy = this.fighters[1 - i];
 
-              if (f.castFreeze > 0) continue; // Đang tụ chiêu cuối
-
               const curSpeed = Math.hypot(f.vx, f.vy) || 1;
-              const awakenMult = f.isAwakened ? 1.18 : 1.0;
+              const formSpeed = FighterForms.speedMultiplier(f);
               const boostMult = f.speedBoostTimer > 0 ? 1.15 : 1.0;
               const slowMult = f.domainSlowTimer > 0 ? 0.25 : 1.0;
-              const targetSpeed = f.char.speed * awakenMult * boostMult * pacingBoost * slowMult;
+              const targetSpeed = f.char.speed * formSpeed * boostMult * slowMult;
               const blended = curSpeed + (targetSpeed - curSpeed) * Math.min(1, subDt * 6.5);
               f.vx = (f.vx / curSpeed) * blended;
               f.vy = (f.vy / curSpeed) * blended;
@@ -3110,10 +2223,10 @@
                   const nvy = f.vx * sJ + f.vy * cJ;
                   f.vx = nvx;
                   f.vy = nvy;
+                  f.motion.wall = .19;
 
                   if (!this.koState) {
-                    f.addEnergy(3);
-                    SoundFX.wall(pacingBoost);
+                    SoundFX.wall(1);
                     if (f.char.skills.passive) {
                       f.char.skills.passive(f, enemy, this, 'onWallBounce');
                     }
@@ -3133,16 +2246,12 @@
                       this.applyDamage(f.redSlamSource, f, 4.2, {
                         isCrit: true,
                         color: '#ff3864',
-                        label: `-${fmtDmg(4.2 * (this.isOverdrive ? 2 : 1))} WALL SLAM!`,
+                        label: `-${fmtDmg(4.2)} WALL SLAM!`,
                         size: 34
                       });
                     }
 
-                    // Kích hoạt Skill 1 khi nảy tường và đã hồi chiêu
-                    if (f.skill1Timer >= f.char.skill1Cd && f.char.skills.skill1 && !this.koState) {
-                      f.skill1Timer = 0;
-                      f.char.skills.skill1(f, enemy, this);
-                    }
+
                   }
                 }
               }
@@ -3161,7 +2270,10 @@
           }
 
           this.updateVisualPools(dt);
-          this.updateTimerDOM();
+          MatchDamage.advance(this, dt);
+          ArenaEffects.advance(this, dt);
+          if (endsNow) this.finishTimedMatch();
+          else this.updateTimerDOM();
         }
 
         updateBlueVortices(dt) {
@@ -3237,7 +2349,7 @@
           const bigUltTypes = [
             'hollow_purple', 'bijuu_dama', 'bajrang_gun',
             'rumbling_wave', 'dora_beam', 'frieren_blackhole',
-            'stormbreaker_ult', 'cap_assemble_ult', 'unibeam_ult', 'gamma_quake'
+            'stormbreaker_ult', 'cap_assemble_ult', 'unibeam_ult'
           ];
           for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
@@ -3254,7 +2366,7 @@
               const d = Math.hypot(p.x - p.target.x, p.y - p.target.y);
               if (d < p.radius + p.target.radius) {
                 p.hit = true;
-                const shown = fmtDmg(p.damage * (this.isOverdrive ? 2 : 1));
+                const shown = fmtDmg(p.damage);
                 const tag = p.type === 'hollow_purple' ? 'PURPLE!'
                   : p.type === 'bijuu_dama' ? 'BIJUU!'
                   : p.type === 'bajrang_gun' ? 'BAJRANG!'
@@ -3264,10 +2376,10 @@
                   : p.type === 'stormbreaker_ult' ? 'STORM!'
                   : p.type === 'cap_assemble_ult' ? 'ASSEMBLE!'
                   : p.type === 'unibeam_ult' ? 'UNIBEAM!'
-                  : p.type === 'gamma_quake' ? 'GAMMA!'
                   : '';
                 const dmgRes = this.applyDamage(p.owner, p.target, p.damage, {
                   isCrit: isBigUlt || p.type === 'thunder_spear',
+                  isRanged: true,
                   color: p.color,
                   label: tag ? `-${shown} ${tag}` : `-${shown}`,
                   size: isBigUlt ? 44 : 30,
@@ -3286,7 +2398,7 @@
                     this.spawnParticles(p.target.x, p.target.y, p.color, isBigUlt ? 50 : 24, 620);
                   } else if (p.type === 'shadow_clone') {
                     this.spawnParticles(p.x, p.y, '#ffffff', 16, 260);
-                  } else if (p.type === 'air_cannon' || p.type === 'thunderclap' || p.type === 'mjolnir') {
+                  } else if (p.type === 'air_cannon' || p.type === 'mjolnir') {
                     const distPush = Math.hypot(p.vx, p.vy) || 1;
                     p.target.vx += (p.vx / distPush) * 480;
                     p.target.vy += (p.vy / distPush) * 480;
@@ -3314,29 +2426,27 @@
           if (dist < minDist && dist > 0.0001) {
             const nx = dx / dist;
             const ny = dy / dist;
-            const overlap = (minDist - dist) * 0.5 + 0.5;
-            a.x -= nx * overlap;
-            a.y -= ny * overlap;
-            b.x += nx * overlap;
-            b.y += ny * overlap;
+            const overlap = minDist - dist + 1;
+            const aShare = b.mass / (a.mass + b.mass);
+            const bShare = 1 - aShare;
+            a.x -= nx * overlap * aShare;
+            a.y -= ny * overlap * aShare;
+            b.x += nx * overlap * bShare;
+            b.y += ny * overlap * bShare;
 
-            const rvx = b.vx - a.vx;
-            const rvy = b.vy - a.vy;
-            const velAlongNormal = rvx * nx + rvy * ny;
-            if (velAlongNormal < 0) {
-              const impulse = -velAlongNormal;
-              a.vx -= impulse * nx;
-              a.vy -= impulse * ny;
-              b.vx += impulse * nx;
-              b.vy += impulse * ny;
+            const relativeSpeed = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+            if (relativeSpeed < 0) {
+              const impulse = -2 * relativeSpeed;
+              a.vx -= impulse * nx * aShare;
+              a.vy -= impulse * ny * aShare;
+              b.vx += impulse * nx * bShare;
+              b.vy += impulse * ny * bShare;
             }
 
             if (this.collisionCooldown <= 0 && !this.koState) {
               this.collisionCooldown = 0.22;
               const cx = (a.x + b.x) / 2;
               const cy = (a.y + b.y) / 2;
-              a.addEnergy(8);
-              b.addEnergy(8);
 
               this.processExchange(a, b, cx, cy, nx, ny);
               if (!this.koState) {
@@ -3346,10 +2456,10 @@
           }
         }
 
-        processExchange(attacker, defender, cx, cy, nx, ny) {
+        processExchange(attacker, defender, cx, cy, nx, ny, useSkill = false) {
           const variance = 0.9 + this.rng() * 0.2;
           const debuffMult = attacker.damageDebuffTimer > 0 ? 0.72 : 1.0;
-          let rawDmg = attacker.char.attack * (attacker.isAwakened ? 1.2 : 1.0) * debuffMult * variance;
+          let rawDmg = attacker.char.attack * debuffMult * variance;
           const isCrit = this.rng() < attacker.char.critChance;
           if (isCrit) rawDmg *= attacker.char.critMult;
 
@@ -3362,13 +2472,9 @@
             cy
           };
 
-          // Kích hoạt Skill 2 cận chiến nếu đã hồi chiêu
-          if (attacker.skill2Timer >= attacker.char.skill2Cd && attacker.char.skills.skill2) {
-            attacker.skill2Timer = 0;
-            attacker.char.skills.skill2(attacker, defender, this, hitInfo);
-          }
+          if (useSkill) attacker.char.skills.skill2(attacker, defender, this, hitInfo);
 
-          const finalDisplayDmg = fmtDmg(hitInfo.damage * (this.isOverdrive ? 2 : 1));
+          const finalDisplayDmg = fmtDmg(hitInfo.damage);
           const dmgRes = this.applyDamage(attacker, defender, hitInfo.damage, {
             isDot: false,
             isCrit: hitInfo.isCrit,
@@ -3392,23 +2498,37 @@
               defender.redSlamSource = attacker;
             }
           }
+          return dmgRes;
         }
 
         applyDamage(attacker, defender, baseAmount, opts) {
           if (this.koState) return { blocked: true, amount: 0 };
 
-          // Overdrive Mode sau 44 giây: Nhân đôi mọi sát thương
-          const scaledAmount = baseAmount * (this.isOverdrive ? 2.0 : 1.0);
-          const dmgInfo = { amount: scaledAmount, isDot: !!opts.isDot, isReflect: !!opts.isReflect, blocked: false };
+          const formDamage = opts.isDot || opts.isReflect ? 1 : FighterForms.damageMultiplier(attacker);
+          const matchScale = Math.min(1, DEFAULT_DURATION / this.matchDuration);
+          const natural = !opts.isPaced && !opts.isFinisher;
+          const scaled = natural ? baseAmount * formDamage * .42 * matchScale : baseAmount;
+          const dmgInfo = {
+            amount: scaled, isDot: !!opts.isDot, isReflect: !!opts.isReflect,
+            isRanged: !!opts.isRanged, blocked: false
+          };
 
-          if (defender.char.skills.passive) {
-            defender.char.skills.passive(defender, attacker, this, 'onTakeDamage', dmgInfo);
+          if (natural) {
+            if (defender.guardTimer > 0 && !opts.isDot) dmgInfo.amount *= .68;
+            defender.char.skills.passive?.(defender, attacker, this, 'onTakeDamage', dmgInfo);
+            if (dmgInfo.blocked) return { ...dmgInfo, amount: 0 };
+            if (!opts.isDot && !opts.isReflect && FighterForms.dodge(this, defender)) {
+              return { ...dmgInfo, blocked: true, amount: 0 };
+            }
           }
-          if (dmgInfo.blocked || dmgInfo.amount <= 0) return dmgInfo;
-
-          defender.currentHp = Math.max(0, defender.currentHp - dmgInfo.amount);
-          defender.addEnergy(opts.isDot ? 2 : 6);
-          if (!opts.isDot) defender.hitFlash = 1.0; // White flash 0.1s
+          dmgInfo.amount = MatchDamage.amount(this, defender, dmgInfo.amount, opts);
+          if (dmgInfo.amount <= 0) return { ...dmgInfo, blocked: true };
+          defender.currentHp -= dmgInfo.amount;
+          if (!opts.isDot) {
+            defender.hitFlash = 1.0;
+            defender.motion.hit = .18;
+          }
+          FighterForms.sync(this, defender);
 
           if (attacker) {
             attacker.totalDamageDealt += dmgInfo.amount;
@@ -3417,32 +2537,41 @@
 
           const fx = opts.cx ?? defender.x;
           const fy = opts.cy ?? defender.y - defender.radius * 0.5;
-          const displayLabel = opts.isDot
-            ? `-${fmtDmg(dmgInfo.amount)} ${opts.label.split(' ')[1] || ''}`.trim()
-            : opts.label;
+          const displayLabel = (opts.label || '-0').replace(/^-\d+(?:\.\d+)?/, `-${fmtDmg(dmgInfo.amount)}`);
           this.spawnFloatingText(fx, fy - 16, displayLabel, opts.color, opts.size);
 
           if (!opts.isDot) {
             SoundFX.hit(opts.isCrit);
-            this.addShake(opts.isCrit ? 14 : 6);
-            this.spawnParticles(fx, fy, opts.isCrit ? '#ffd60a' : attacker.char.color, opts.isCrit ? 22 : 12, 420);
+            this.addShake(opts.isFinisher ? 18 : opts.isPaced ? 3 : opts.isCrit ? 14 : 6);
+            this.spawnParticles(fx, fy, opts.isCrit ? '#ffd60a' : (attacker?.char.color || opts.color), opts.isFinisher ? 28 : opts.isPaced ? 6 : opts.isCrit ? 22 : 12, opts.isPaced ? 185 : 420);
           }
 
-          if (defender.currentHp <= 0) {
-            this.triggerKO(attacker, defender);
-          }
           return dmgInfo;
         }
 
-        triggerKO(winner, loser) {
-          this.koState = { winner, loser, realTimer: 0, duration: 1.5 };
+        finishTimedMatch() {
+          this.elapsed = this.matchDuration;
+          this.running = false;
+          TransformationScene.clear(this);
+          this.floatingTexts.length = 0;
+          const { winner, loser } = MatchDamage.resolve(this);
+          loser.displayHp = loser.trailHp = loser.currentHp;
+          this.koState = { winner, loser, realTimer: 0 };
+          for (const fighter of this.fighters) {
+            fighter.skillCast = null;
+            fighter.activeSkillCallout = null;
+          }
+          this.ultCinematic.active = false;
+          this.skillPopups.length = 0;
+          this.projectiles.length = 0;
+          this.blueVortices.length = 0;
           SoundFX.ko();
-          this.addShake(34);
-          this.triggerFlash('#ffffff', 0.9);
-          this.spawnRing(loser.x, loser.y, 20, 440, winner.char.color, 0.85);
-          this.spawnRing(loser.x, loser.y, 10, 300, '#ffffff', 0.6);
-          this.spawnParticles(loser.x, loser.y, loser.char.color, 80, 780);
-          this.spawnParticles(loser.x, loser.y, '#ffffff', 40, 620);
+          this.addShake(24);
+          this.triggerFlash(FighterForms.color(winner), .31);
+          this.spawnRing(loser.x, loser.y, 20, 370, FighterForms.color(winner), .68);
+          this.spawnRing(loser.x, loser.y, 10, 235, '#ffffff', .52);
+          this.spawnParticles(loser.x, loser.y, FighterForms.color(winner), 48, 570);
+          this.updateTimerDOM();
         }
 
         updateVisualPools(dt) {
@@ -3482,10 +2611,14 @@
         updateTimerDOM() {
           const el = document.getElementById('ui-timer');
           if (!el) return;
-          const mins = Math.floor(this.elapsed / 60);
-          const secs = (this.elapsed % 60).toFixed(1).padStart(4, '0');
-          el.textContent = `${String(mins).padStart(2, '0')}:${secs}`;
-          el.style.color = this.elapsed >= 48 && this.elapsed <= 62 ? '#38ff7a' : this.elapsed > 62 ? '#ffaa00' : '#00f3ff';
+          const text = this.timerLabel();
+          if (el.textContent !== text) el.textContent = text;
+          el.style.color = this.koState ? '#7efabf' : '#00f3ff';
+        }
+
+        timerLabel() {
+          const seconds = this.koState ? this.matchDuration : Math.floor(this.elapsed * 10) / 10;
+          return formatClock(seconds) + ' / ' + formatClock(this.matchDuration);
         }
 
         // =====================================================================
@@ -3493,6 +2626,10 @@
         // =====================================================================
         render() {
           ctx.save();
+          ctx.fillStyle = '#0a0a10';
+          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+          ctx.save();
+          TransformationScene.applyCamera(ctx, this);
 
           if (this.shakeIntensity > 0.2) {
             ctx.translate((Math.random() - 0.5) * this.shakeIntensity * 2, (Math.random() - 0.5) * this.shakeIntensity * 2);
@@ -3516,16 +2653,6 @@
             ctx.restore();
           }
 
-          // Nền đỏ thẫm khi Sukuna kích hoạt Malevolent Shrine
-          if (this.domainEffect) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(120, 0, 24, 0.24)';
-            ctx.beginPath();
-            ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-          }
-
           // Shockwave Rings
           for (const r of this.rings) {
             const p = r.age / r.duration;
@@ -3545,10 +2672,18 @@
           // Màn hình tối dần 0.4s khi tung Ultimate (trước khi vẽ nhân vật để nhân vật nổi bật)
           if (this.ultCinematic.active) {
             const p = this.ultCinematic.timer / this.ultCinematic.duration;
-            const dim = p < 0.2 ? (p / 0.2) * 0.6 : (1 - (p - 0.2) / 0.8) * 0.6;
+            const dim = p < 0.2 ? (p / 0.2) * .27 : (1 - (p - 0.2) / 0.8) * .27;
             ctx.fillStyle = `rgba(4, 4, 10, ${Math.max(0, dim)})`;
             ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
           }
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius + 6, 0, Math.PI * 2);
+          ctx.clip();
+          for (const fighter of this.fighters) SkillTimeline.drawBackground(ctx, fighter);
+          ctx.restore();
+          TransformationScene.drawWorld(ctx, this);
 
           // Vẽ 2 quả bóng nhân vật đa tầng
           for (const f of this.fighters) {
@@ -3556,7 +2691,14 @@
             this.drawFighter(f);
           }
 
-          // Vẽ Đạn / Chưởng (Dismantle & Hollow Purple)
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius + 6, 0, Math.PI * 2);
+          ctx.clip();
+          for (const fighter of this.fighters) SkillTimeline.draw(ctx, fighter);
+          MatchDamage.draw(ctx, this);
+          ctx.restore();
+
           this.drawProjectiles();
 
           // Vết chém (Cleave / Malevolent Shrine)
@@ -3632,6 +2774,8 @@
             ctx.restore();
           }
 
+          ctx.restore();
+
           // Tên Ultimate lớn ở phía trên vòng tròn sàn đấu (không che tầm nhìn 2 quả bóng)
           if (this.ultCinematic.active) {
             const p = this.ultCinematic.timer / this.ultCinematic.duration;
@@ -3645,14 +2789,16 @@
             ctx.shadowBlur = 36;
             ctx.lineWidth = 11;
             ctx.strokeStyle = '#050508';
-            ctx.strokeText(this.ultCinematic.text, 0, 0);
+            const width = 925 / sc;
+            ctx.strokeText(this.ultCinematic.text, 0, 0, width);
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(this.ultCinematic.text, 0, 0);
+            ctx.fillText(this.ultCinematic.text, 0, 0, width);
             ctx.restore();
           }
 
           this.drawTopHUD();
           this.drawBottomHUD();
+          TransformationScene.drawTitle(ctx, this, CANVAS_W);
 
           if (this.flash.alpha > 0.01) {
             ctx.save();
@@ -3674,7 +2820,7 @@
           ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
           const bgGrad = ctx.createRadialGradient(ARENA_CX, ARENA_CY, 60, ARENA_CX, ARENA_CY, 700);
-          bgGrad.addColorStop(0, this.isOverdrive ? 'rgba(255, 0, 60, 0.16)' : 'rgba(0, 200, 255, 0.09)');
+          bgGrad.addColorStop(0, this.clashAge > 0 ? 'rgba(99, 81, 191, 0.25)' : 'rgba(0, 200, 255, 0.09)');
           bgGrad.addColorStop(1, 'rgba(13, 13, 18, 0)');
           ctx.fillStyle = bgGrad;
           ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
@@ -3688,24 +2834,10 @@
         }
 
         drawArenaRing() {
-          if (this.isShrinking) {
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([14, 14]);
-            ctx.beginPath();
-            ctx.arc(ARENA_CX, ARENA_CY, ARENA_INITIAL_RADIUS, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-          }
-
           ctx.save();
-          ctx.fillStyle = 'rgba(8, 9, 14, 0.88)';
-          ctx.beginPath();
-          ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
-          ctx.fill();
+          ArenaEffects.drawFloor(ctx, this, ARENA_CX, ARENA_CY);
 
-          const ringColor = this.isOverdrive ? '#ff003c' : this.isShrinking ? '#ff8800' : '#00f3ff';
+          const ringColor = '#00f3ff';
           ctx.strokeStyle = ringColor;
           ctx.lineWidth = 9;
           ctx.shadowColor = ringColor;
@@ -3721,9 +2853,10 @@
           ctx.arc(ARENA_CX, ARENA_CY, this.arenaRadius, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
+          ArenaEffects.drawRim(ctx, this, ARENA_CX, ARENA_CY, ringColor);
         }
 
-        drawAvatarAt(character, x, y, r, isAwakened = false) {
+        drawAvatarAt(character, x, y, r, style) {
           if (character.avatarLoaded && character.avatarImg) {
             ctx.save();
             ctx.beginPath();
@@ -3735,65 +2868,84 @@
             const dh = img.height * scale;
             ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
             ctx.restore();
-          } else {
-            character.drawFallbackAvatar(ctx, x, y, r, isAwakened);
+          } else if (!FighterPortraits.draw(ctx, character.id, x, y, r, style)) {
+            character.drawFallbackAvatar?.(ctx, x, y, r, style.form >= 3);
           }
         }
 
         drawFighter(f) {
-          const r = f.radius * f.ultScale;
-
-          // 1. Afterimage Trail
-          for (let i = 0; i < f.trail.length; i++) {
-            const pt = f.trail[i];
-            const ratio = (i + 1) / f.trail.length;
-            ctx.save();
-            ctx.globalAlpha = ratio * 0.22;
-            ctx.fillStyle = f.char.color;
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, r * (0.45 + ratio * 0.5), 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+          const before = f.formBefore;
+          const r = before?.radius || f.radius;
+          const style = FighterAnimator.pose(f, this.time, this.running, f.currentHp <= 0);
+          if (before) {
+            style.form = before.stage;
+            style.color = before.color;
           }
+          TransformationScene.shapePose(this, f, style);
+          const rig = UltimateAnimator.pose(this, f, r);
+          const shrink = 1 - .28 * Math.min(1, f.shrinkTimer * 4);
+          style.sx *= shrink;
+          style.sy *= shrink;
+          if (this.transformation.active && this.transformation.active.fighter !== f) style.opacity *= .58;
+          const accent = style.color;
 
-          // 2. Lớp Aura ngoài (gấp đôi kích thước khi Awakening < 30% HP)
+          FighterAnimator.drawTrail(ctx, f, accent, (x, y) => this.drawAvatarAt(f.char, x, y, r * .9, style));
+
+          const auraSize = r * (1.24 + style.form * .12);
           ctx.save();
-          const auraSize = f.isAwakened ? 34 : 16;
-          const auraGrad = ctx.createRadialGradient(f.x, f.y, r * 0.8, f.x, f.y, r + auraSize);
-          auraGrad.addColorStop(0, f.char.color);
-          auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.globalAlpha = f.isAwakened ? 0.65 : 0.35;
-          ctx.fillStyle = auraGrad;
+          ctx.globalAlpha = style.opacity * (.29 + style.form * .13);
+          const aura = ctx.createRadialGradient(f.x, f.y, r * .56, f.x, f.y, auraSize);
+          aura.addColorStop(0, accent);
+          aura.addColorStop(1, 'transparent');
+          ctx.fillStyle = aura;
           ctx.beginPath();
-          ctx.arc(f.x, f.y, r + auraSize, 0, Math.PI * 2);
+          ctx.arc(f.x, f.y, auraSize, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
 
-          // 3. Custom Character Effects (Hexagon Shield, Awakening Fire, Charge Orbs)
-          if (f.char.drawCustomEffects) {
-            f.char.drawCustomEffects(ctx, f, this.time);
+          f.char.drawCustomEffects?.(ctx, f, this.time);
+          if (f.guardTimer > 0) {
+            ctx.save();
+            ctx.globalAlpha = Math.min(.64, f.guardTimer);
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 4;
+            ctx.setLineDash([11, 5]);
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, r * 1.25, this.time * 2, this.time * 2 + Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
           }
 
-          // 4. Core Avatar (URL Image hoặc Canvas Fallback chi tiết)
           ctx.save();
-          ctx.shadowColor = f.char.color;
-          ctx.shadowBlur = f.isAwakened ? 38 : 22;
-          this.drawAvatarAt(f.char, f.x, f.y, r, f.isAwakened);
-
-          // Viền Neon ngoài
-          ctx.lineWidth = f.isAwakened ? 8 : 5.5;
-          ctx.strokeStyle = f.hitFlash > 0.15 ? '#ffffff' : f.char.color;
-          ctx.beginPath();
-          ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // White Flash 0.1s khi dính đòn
-          if (f.hitFlash > 0.05) {
-            ctx.globalAlpha = f.hitFlash * 0.78;
-            ctx.fillStyle = '#ffffff';
+          ctx.globalAlpha = style.opacity;
+          ctx.translate(style.x, style.y);
+          ctx.rotate(style.tilt);
+          ctx.scale(style.sx, style.sy);
+          if (style.form > 0) {
+            ctx.strokeStyle = accent;
+            ctx.globalAlpha *= .56;
+            ctx.lineWidth = 2.5 + style.form;
+            const arcStart = this.time * (f.side ? -2.2 : 2.2);
             ctx.beginPath();
-            ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.arc(0, 0, r * 1.13, arcStart, arcStart + Math.PI * .78);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.13, arcStart + Math.PI, arcStart + Math.PI * 1.78);
+            ctx.stroke();
+            ctx.globalAlpha = style.opacity;
+          }
+          if (rig) UltimateAnimator.drawBack(ctx, rig);
+          this.drawAvatarAt(f.char, 0, 0, r * (1.10 + style.form * .016), style);
+          if (rig) UltimateAnimator.drawFront(ctx, rig);
+          if (f.hitFlash > .15) {
+            ctx.globalAlpha = style.opacity * f.hitFlash * .55;
+            ctx.strokeStyle = '#fff9f2';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.03, -.9, 1.05);
+            ctx.moveTo(-r, r * .13);
+            ctx.arc(0, 0, r * 1.03, 3, 4.65);
+            ctx.stroke();
           }
           ctx.restore();
 
@@ -3814,7 +2966,7 @@
           const pillW = r * 1.16;
           const pillH = r * 0.52;
           const pillX = f.x - pillW / 2;
-          const pillY = f.y + r * 0.88 - pillH / 2;
+          const pillY = f.y + r * (rig ? 2.05 * shrink : 1.15) - pillH / 2;
 
           ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
           ctx.shadowBlur = 10;
@@ -3823,7 +2975,7 @@
           ctx.fill();
 
           ctx.shadowBlur = 0;
-          ctx.strokeStyle = '#f3d8b8';
+          ctx.strokeStyle = accent;
           ctx.lineWidth = 2.6;
           this.roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
           ctx.stroke();
@@ -3877,31 +3029,17 @@
               ctx.fill();
             } else if (p.type === 'shadow_clone') {
               ctx.globalAlpha = 0.9;
-              this.drawAvatarAt(p.owner.char, p.x, p.y, p.radius, p.owner.isAwakened);
+              this.drawAvatarAt(p.owner.char, p.x, p.y, p.radius, {
+                form: p.owner.formStage, pose: 'attack', wind: 0, color: FighterForms.color(p.owner), compact: true
+              });
               ctx.strokeStyle = '#ffb703';
               ctx.lineWidth = 4;
               ctx.beginPath();
               ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
               ctx.stroke();
-            } else if (p.type === 'jet_pistol') {
-              ctx.translate(p.x, p.y);
-              ctx.rotate(p.angle);
-              ctx.strokeStyle = '#ff595e';
-              ctx.lineWidth = 14;
-              ctx.lineCap = 'round';
-              ctx.shadowColor = '#ff3b30';
-              ctx.shadowBlur = 18;
-              ctx.beginPath();
-              ctx.moveTo(-48, 0);
-              ctx.lineTo(14, 0);
-              ctx.stroke();
-              ctx.fillStyle = '#ffffff';
-              ctx.beginPath();
-              ctx.arc(16, 0, 14, 0, Math.PI * 2);
-              ctx.fill();
             } else if (
               p.type === 'rumbling_wave' || p.type === 'dora_beam' || p.type === 'frieren_blackhole' ||
-              p.type === 'stormbreaker_ult' || p.type === 'cap_assemble_ult' || p.type === 'unibeam_ult' || p.type === 'gamma_quake'
+              p.type === 'stormbreaker_ult' || p.type === 'cap_assemble_ult' || p.type === 'unibeam_ult'
             ) {
               const g = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, p.radius);
               g.addColorStop(0, p.type === 'frieren_blackhole' ? '#070514' : '#ffffff');
@@ -3952,8 +3090,8 @@
               ctx.lineTo(-22, 9);
               ctx.closePath();
               ctx.fill();
-            } else if (p.type === 'air_cannon' || p.type === 'thunderclap') {
-              ctx.strokeStyle = p.type === 'thunderclap' ? '#4ade80' : '#ffffff';
+            } else if (p.type === 'air_cannon') {
+              ctx.strokeStyle = '#ffffff';
               ctx.shadowColor = p.color;
               ctx.shadowBlur = 20;
               ctx.lineWidth = 7;
@@ -3989,9 +3127,9 @@
 
           ctx.font = `700 22px 'Segoe UI', sans-serif`;
           ctx.shadowBlur = 0;
-          ctx.fillStyle = this.isOverdrive ? '#ffd60a' : '#9aa3c4';
+          ctx.fillStyle = this.clashAge > 0 ? '#c6afff' : '#9aa3c4';
           ctx.fillText(
-            this.isOverdrive ? '⚡ OVERDRIVE MODE — 2X DAMAGE ACTIVE ⚡' : 'LORE ACCURATE ARENA • WHO WINS?',
+            this.clashAge > 0 ? 'ARENA CLASH' : 'LORE ACCURATE ARENA • WHO WINS?',
             ARENA_CX,
             150
           );
@@ -4058,23 +3196,9 @@
           this.roundRect(ctx, barX, y + 6, barW, barH, 9);
           ctx.stroke();
 
-          // 2. Thanh Năng lượng (Energy Bar 0-100 vàng/tím ngay dưới HP)
-          const enY = y + barH + 14;
-          const enH = 14;
-          ctx.fillStyle = '#141621';
-          this.roundRect(ctx, barX, enY, barW, enH, 6);
-          ctx.fill();
+          const statusY = y + barH + 14;
 
-          const enPct = Math.max(0, Math.min(1, f.displayEnergy / 100));
-          const enGrad = ctx.createLinearGradient(barX, enY, barX + barW, enY);
-          enGrad.addColorStop(0, '#ffd60a');
-          enGrad.addColorStop(1, '#c77dff');
-          ctx.fillStyle = enGrad;
-          if (isLeft) this.roundRect(ctx, barX, enY, barW * enPct, enH, 6);
-          else this.roundRect(ctx, barX + barW * (1 - enPct), enY, barW * enPct, enH, 6);
-          ctx.fill();
-
-          // 3. Icon trạng thái nhỏ (Khiên Gojo / Chảy máu Sukuna / Awakening)
+          // Form, damage bonus and status indicators
           const badges = [];
           if (f.char.id === 'gojo') {
             if (f.custom.shieldActive) badges.push({ text: '⬡ INFINITY', color: '#00f3ff' });
@@ -4083,17 +3207,21 @@
           if (f.bleedStacks.length > 0) {
             badges.push({ text: `🩸 BLEED x${f.bleedStacks.length}`, color: '#ff2a55' });
           }
-          if (f.isAwakened) {
-            badges.push({ text: '🔥 AWAKENED', color: '#ffd60a' });
-          }
+          const damageBonus = Math.round((FighterForms.damageMultiplier(f) - 1) * 100);
+          const formLabel = FighterForms.name(f).toUpperCase() + ' · DMG +' + damageBonus + '%';
+          badges.unshift({ text: formLabel, color: FighterForms.color(f) });
 
-          let bx = isLeft ? barX + 26 : barX + barW - 26;
-          ctx.font = `800 18px 'Segoe UI', sans-serif`;
+          ctx.font = '800 17px Segoe UI, sans-serif';
           ctx.textAlign = isLeft ? 'left' : 'right';
-          for (const b of badges) {
-            ctx.fillStyle = b.color;
-            ctx.fillText(b.text, bx, enY + 34);
-            bx += isLeft ? 132 : -132;
+          const badgeX = isLeft ? barX + 18 : barX + barW - 18;
+          const badgeDirection = isLeft ? 1 : -1;
+          let offset = 0;
+          for (const badge of badges) {
+            const width = ctx.measureText(badge.text).width;
+            if (offset + width > barW - 25) break;
+            ctx.fillStyle = badge.color;
+            ctx.fillText(badge.text, badgeX + offset * badgeDirection, statusY + 20);
+            offset += width + 13;
           }
 
           // 3.5. Hiển thị Tên Skill ngay dưới vạch máu (không che tầm nhìn sàn đấu!)
@@ -4108,7 +3236,7 @@
             ctx.save();
             ctx.globalAlpha = alpha;
             const sx = isLeft ? barX + 26 : barX + barW - 26;
-            const sy = enY + 74;
+            const sy = statusY + 61;
             ctx.translate(sx, sy);
             ctx.scale(pop, pop);
             ctx.font = `900 26px 'Segoe UI', Impact, sans-serif`;
@@ -4123,38 +3251,18 @@
             ctx.restore();
           }
 
-          // 4. Avatar tròn ở đầu thanh trạng thái
-          const avX = isLeft ? x + 36 : x + width - 36;
-          const avY = y + 32;
-          this.drawAvatarAt(f.char, avX, avY, avR, f.isAwakened);
-          ctx.strokeStyle = f.char.color;
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-          ctx.stroke();
+          const avX = isLeft ? x + 30 : x + width - 30;
+          const avY = y + 29;
+          this.drawAvatarAt(f.char, avX, avY, avR * .87, {
+            form: f.formStage, pose: 'idle', wind: 0, color: FighterForms.color(f), compact: true
+          });
 
           ctx.restore();
         }
 
         drawBottomHUD() {
           ctx.save();
-          const mins = Math.floor(this.elapsed / 60);
-          const secs = (this.elapsed % 60).toFixed(1).padStart(4, '0');
-          ctx.font = `800 32px 'Consolas', monospace`;
           ctx.textAlign = 'center';
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-          ctx.fillText(`⏱ ${String(mins).padStart(2, '0')}:${secs}`, ARENA_CX, 1630);
-
-          if (this.isOverdrive) {
-            ctx.font = `900 26px 'Segoe UI', sans-serif`;
-            ctx.fillStyle = '#ffd60a';
-            ctx.fillText('⚡ OVERDRIVE: 2X DAMAGE ⚡', ARENA_CX, 1676);
-          } else if (this.isShrinking) {
-            ctx.font = `800 24px 'Segoe UI', sans-serif`;
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillText('⚠ ARENA SHRINKING', ARENA_CX, 1676);
-          }
-
           ctx.font = `700 28px 'Segoe UI', sans-serif`;
           ctx.fillStyle = 'rgba(255, 255, 255, 0.56)';
           ctx.fillText('Comment the next battle! Top comment wins 👇', ARENA_CX, 1805);
@@ -4163,8 +3271,9 @@
 
         // Bảng kết quả cuối trận hoàn toàn bằng TIẾNG ANH
         drawKOOverlay() {
-          const { winner, realTimer } = this.koState;
+          const { winner, loser, realTimer } = this.koState;
           const fade = Math.min(1, realTimer / 0.45);
+
 
           ctx.save();
           ctx.fillStyle = `rgba(5, 6, 11, ${fade * 0.65})`;
@@ -4184,8 +3293,8 @@
           ctx.fillText('K.O!', 0, 0);
           ctx.restore();
 
-          if (realTimer > 0.4) {
-            const cardFade = Math.min(1, (realTimer - 0.4) / 0.35);
+          {
+            const cardFade = Math.min(1, .82 + realTimer * .6);
             ctx.save();
             ctx.globalAlpha = cardFade;
 
@@ -4194,7 +3303,7 @@
             ctx.shadowColor = winner.char.color;
             ctx.shadowBlur = 30;
             ctx.fillStyle = winner.char.color;
-            ctx.fillText(`${winner.char.name} WINS!`, ARENA_CX, 955);
+            ctx.fillText(`${winner.char.name} WINS!`, ARENA_CX, 955, 960);
             ctx.shadowBlur = 0;
 
             const boxW = 680;
@@ -4211,7 +3320,7 @@
 
             ctx.font = `800 34px 'Segoe UI', sans-serif`;
             ctx.fillStyle = '#f2f5ff';
-            ctx.fillText(`Remaining HP: ${Math.ceil(winner.currentHp)} / ${winner.maxHp}`, ARENA_CX, boxY + 70);
+            ctx.fillText(`${winner.side === 0 ? 'LEFT' : 'RIGHT'}  •  ${Math.ceil(winner.currentHp)} / ${winner.maxHp} HP`, ARENA_CX, boxY + 70);
             ctx.fillText(`Match Duration: ${this.elapsed.toFixed(1)}s`, ARENA_CX, boxY + 130);
 
             ctx.fillStyle = '#9aa4c7';
@@ -4252,8 +3361,8 @@
       const inputAvatarP1 = document.getElementById('input-avatar-p1');
       const inputAvatarP2 = document.getElementById('input-avatar-p2');
       const inputSeed = document.getElementById('input-seed');
-      const sliderSpeed = document.getElementById('slider-speed');
-      const labelSpeed = document.getElementById('label-speed');
+      const durationInput = document.getElementById('input-duration');
+      const winnerSelect = document.getElementById('select-winner');
       const toast = document.getElementById('toast');
 
       // Searchable Character Picker Component (Hỗ trợ gõ tìm nhanh khi có nhiều nhân vật)
@@ -4470,6 +3579,8 @@
         }
       };
 
+      const compactViewport = window.matchMedia('(max-width: 760px)');
+
       function toggleUI() {
         const hidden = panel.classList.toggle('hidden');
         btnShowUi.classList.toggle('visible', hidden);
@@ -4492,28 +3603,25 @@
       });
 
       function syncStartBtn() {
-        btnStart.textContent = game.running ? '⏸ Pause' : '▶ Start';
+        btnStart.textContent = game.koState ? '▶ Replay' : game.running ? '⏸ Pause' : '▶ Start';
+        durationInput.disabled = game.running || (!game.koState && game.elapsed > 0);
       }
 
       function toggleRun() {
-        SoundFX.ensure();
-        if (game.koState) {
-          game.reset();
-          game.running = true;
-          if (MatchRecorder.autoRecord && !MatchRecorder.isRecording) {
-            MatchRecorder.start();
-          }
-        } else {
-          const startingFresh = !game.running && game.elapsed === 0;
-          game.running = !game.running;
-          if (startingFresh && MatchRecorder.autoRecord && !MatchRecorder.isRecording) {
-            MatchRecorder.start();
-          }
+        if (game.koState || (!game.running && game.elapsed === 0)) {
+          restartMatch(true);
+          return;
         }
+        game.running = !game.running;
+        lastTs = performance.now();
         syncStartBtn();
       }
 
       function restartMatch(autoStart = true) {
+        const duration = durationInput.valueAsNumber;
+        if (autoStart && (!durationInput.reportValidity() || !Number.isFinite(duration))) return;
+        if (Number.isFinite(duration) && durationInput.validity.valid) game.matchDuration = duration;
+        game.winnerPreference = winnerSelect.value;
         SoundFX.ensure();
         if (MatchRecorder.isRecording) MatchRecorder.stop();
         game.seed = inputSeed.value.trim() || '7772026';
@@ -4521,9 +3629,9 @@
         game.p2Id = pickerP2.getValue();
         game.reset();
         game.running = autoStart;
-        if (autoStart && MatchRecorder.autoRecord) {
-          MatchRecorder.start();
-        }
+        if (autoStart) lastTs = performance.now();
+        if (autoStart && compactViewport.matches && !panel.classList.contains('hidden')) toggleUI();
+        if (autoStart && MatchRecorder.autoRecord) MatchRecorder.start();
         syncStartBtn();
       }
 
@@ -4564,9 +3672,10 @@
 
       inputSeed.addEventListener('change', () => restartMatch(false));
 
-      sliderSpeed.addEventListener('input', () => {
-        game.userSpeed = parseFloat(sliderSpeed.value);
-        labelSpeed.textContent = `${game.userSpeed.toFixed(2).replace(/\.00$/, '.0')}x`;
+      winnerSelect.addEventListener('change', () => { game.winnerPreference = winnerSelect.value; });
+
+      durationInput.addEventListener('change', () => {
+        if (!game.running && game.elapsed === 0 && durationInput.validity.valid) restartMatch(false);
       });
 
       let toastTimer = null;
@@ -4592,9 +3701,11 @@
 
       let lastTs = performance.now();
       function loop(now) {
-        const rawDt = Math.min(0.05, (now - lastTs) / 1000);
+        const rawDt = Math.max(0, (now - lastTs) / 1000);
         lastTs = now;
+        const wasRunning = game.running;
         game.update(rawDt);
+        if (wasRunning !== game.running) syncStartBtn();
         game.render();
         MatchRecorder.checkAutoStop();
         requestAnimationFrame(loop);
