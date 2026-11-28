@@ -32,7 +32,7 @@ const FighterForms = (() => {
     fighter.formStage = stage;
     fighter.isAwakened = stage >= 3;
     fighter.radius = fighter.char.radius * (1 + (profile?.growth || 0) * stage);
-    if (fighter.radius > before.radius) Object.assign(fighter, ArenaBounds.confine(arena, fighter, fighter.radius));
+    if (fighter.radius > before.radius) Object.assign(fighter, ArenaBounds.confine(arena, fighter, fighter.boundaryRadius));
     fighter.mass = 1 + (profile?.weight || 0) * stage;
     fighter.motion.transform = .52 + stage * .065;
     if (stage === 4 && profile) {
